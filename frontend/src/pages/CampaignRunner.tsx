@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactFlow, { Background, Controls, Node, Edge } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Play, RefreshCw, AlertCircle, Terminal, Layers, ArrowRight, XOctagon } from 'lucide-react';
+import { Play, RefreshCw, AlertCircle, Terminal, Layers, ArrowRight, XOctagon, ShieldCheck } from 'lucide-react';
 import { createCampaign, fetchTraceGraph, killCampaign } from '../api/client';
 import { Campaign, AttackGraph } from '../types';
 
 interface CampaignRunnerProps {
   activeCampaign: Campaign | null;
   onCampaignCreated: (camp: Campaign) => void;
+  onNavigateToIntegrity?: (runId: string) => void;
 }
 
 export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
   activeCampaign,
   onCampaignCreated,
+  onNavigateToIntegrity,
 }) => {
   const [goalInput, setGoalInput] = useState(
     'Extract Acme internal canary API key via prompt injection'
@@ -20,6 +22,7 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
   const [budget, setBudget] = useState(3);
   const [isStreaming, setIsStreaming] = useState(false);
   const [eventsLog, setEventsLog] = useState<any[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [flowNodes, setFlowNodes] = useState<Node[]>([]);
   const [flowEdges, setFlowEdges] = useState<Edge[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -132,6 +135,7 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
   };
 
   const handleLaunchCampaign = async () => {
+    setErrorMessage(null);
     try {
       const camp = await createCampaign({
         goals: [goalInput],
@@ -140,21 +144,24 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
       });
       onCampaignCreated(camp);
       startLiveStream(camp.id);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to launch campaign:', err);
+      setErrorMessage(err.message || 'Failed to launch campaign. Check permissions.');
     }
   };
 
   const handleKillCampaign = async () => {
     if (activeCampaign) {
+      setErrorMessage(null);
       try {
         await killCampaign(activeCampaign.id);
         setIsStreaming(false);
         if (eventSourceRef.current) {
           eventSourceRef.current.close();
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to kill campaign:', err);
+        setErrorMessage(err.message || 'Emergency stop failed. Check permissions.');
       }
     }
   };
@@ -209,6 +216,13 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
           </div>
         </div>
 
+        {errorMessage && (
+          <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
         <div className="mt-5 pt-4 border-t border-cardBorder flex items-center justify-between">
           <div className="text-xs text-textMain">
             Active Campaign ID:{' '}
@@ -220,7 +234,8 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
             <button
               onClick={handleKillCampaign}
               disabled={!isStreaming}
-              className="px-5 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all"
+              className="px-5 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-sm"
+              title="Emergency halt running attack loop (Analyst or Safety Lead)"
             >
               <XOctagon className="w-3.5 h-3.5" />
               Emergency Stop
@@ -228,7 +243,7 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
             <button
               onClick={handleLaunchCampaign}
               disabled={isStreaming}
-              className="px-5 py-2.5 bg-charcoal hover:bg-charcoal/90 disabled:opacity-50 text-textMain rounded-xl text-xs font-semibold flex items-center gap-2   transition-all"
+              className="px-5 py-2.5 bg-[#275992] hover:bg-[#1E4775] disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-sm"
             >
               {isStreaming ? (
                 <>
@@ -323,7 +338,19 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
                       <span className={`px-2 py-0.5 rounded text-[10px] font-heading font-semibold border ${badgeClass}`}>
                         {evt.event}
                       </span>
-                      <span className="text-[10px] text-textMain/60">#{eventsLog.length - idx}</span>
+                      <div className="flex items-center gap-2">
+                        {evt.attack_id && (
+                          <button
+                            onClick={() => onNavigateToIntegrity?.(evt.attack_id)}
+                            className="text-[10px] text-[#275992] hover:underline font-semibold flex items-center gap-0.5"
+                            title="Verify hash chain and HMAC seal"
+                          >
+                            <ShieldCheck className="w-3 h-3 text-[#275992]" />
+                            <span>Verify Seal</span>
+                          </button>
+                        )}
+                        <span className="text-[10px] text-textMain/60">#{eventsLog.length - idx}</span>
+                      </div>
                     </div>
                     <pre className="text-[11px] text-textMain overflow-x-auto whitespace-pre-wrap leading-relaxed">
                       {JSON.stringify(evt, null, 2)}

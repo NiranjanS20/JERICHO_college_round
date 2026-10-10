@@ -152,3 +152,67 @@ async def test_role_enforcement_and_audit_route():
         data = resp_admin.json()
         assert "logs" in data
         assert data["requested_by"] == "admin-1"
+
+
+@pytest.mark.asyncio
+async def test_unified_role_permissions_matrix():
+    """Verify role-scoped workspace permission matrix via X-Role header."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Campaign Launch: Analyst & Safety Lead allowed, Auditor & Owner rejected
+        resp_auditor_launch = await client.post(
+            "/api/campaigns",
+            headers={"X-Role": "auditor"},
+            json={"goals": ["Exfiltrate key"], "budget_per_goal": 1},
+        )
+        assert resp_auditor_launch.status_code == 403
+
+        resp_owner_launch = await client.post(
+            "/api/campaigns",
+            headers={"X-Role": "owner"},
+            json={"goals": ["Exfiltrate key"], "budget_per_goal": 1},
+        )
+        assert resp_owner_launch.status_code == 403
+
+        # 2. Emergency Stop / Kill: Auditor rejected, Analyst allowed
+        resp_auditor_kill = await client.post(
+            "/api/campaigns/camp-test-123/kill",
+            headers={"X-Role": "auditor"},
+        )
+        assert resp_auditor_kill.status_code == 403
+
+        resp_analyst_kill = await client.post(
+            "/api/campaigns/camp-test-123/kill",
+            headers={"X-Role": "analyst"},
+        )
+        assert resp_analyst_kill.status_code == 200
+
+        # 3. Integrity Verification: Analyst rejected, Auditor allowed
+        resp_analyst_integrity = await client.get(
+            "/api/integrity/test-run-123",
+            headers={"X-Role": "analyst"},
+        )
+        assert resp_analyst_integrity.status_code == 403
+
+        resp_auditor_integrity = await client.get(
+            "/api/integrity/test-run-123",
+            headers={"X-Role": "auditor"},
+        )
+        assert resp_auditor_integrity.status_code == 200
+        assert resp_auditor_integrity.json()["status"] == "VERIFIED"
+
+        # 4. Governance Reassignment: Owner rejected, Safety Lead allowed
+        resp_owner_gov = await client.put(
+            "/api/governance/owners/sys-prompt",
+            headers={"X-Role": "owner"},
+            json={"owner": "rogue-team"},
+        )
+        assert resp_owner_gov.status_code == 403
+
+        resp_lead_gov = await client.put(
+            "/api/governance/owners/sys-prompt",
+            headers={"X-Role": "safety_lead"},
+            json={"owner": "ai-safety-core"},
+        )
+        assert resp_lead_gov.status_code == 200
+        assert resp_lead_gov.json()["owner"] == "ai-safety-core"

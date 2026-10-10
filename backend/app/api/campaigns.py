@@ -24,6 +24,9 @@ from app.victim.agent import VictimAgent
 from app.attacker.engine import AdaptiveAttackEngine
 from app.defenses import DEFENSE_REGISTRY
 
+from app.security.rbac import require_permission
+from app.security.auth import Principal
+
 router = APIRouter(prefix="/api/campaigns", tags=["campaigns"])
 
 
@@ -151,6 +154,7 @@ async def _run_campaign_worker(
 async def create_campaign(
     payload: CampaignCreate,
     db: AsyncSession = Depends(get_db),
+    _principal: Principal = Depends(require_permission("launch_campaign")),
 ) -> Campaign:
     """Create a new campaign and start background attack discovery."""
     campaign = Campaign(

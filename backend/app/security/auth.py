@@ -125,13 +125,19 @@ def verify_token(token: str) -> UserSession:
     )
 
 
-async def get_current_user(authorization: Optional[str] = Header(None)) -> UserSession:
-    """Dependency that parses and verifies bearer tokens from Authorization header."""
+async def get_current_user(
+    request: Request,
+    authorization: Optional[str] = Header(None),
+) -> UserSession:
+    """Dependency that parses bearer tokens or X-Role header in role-scoped workspace mode."""
     if not authorization:
-        # Default session for unauthenticated requests in dev mode
+        x_role = request.headers.get("X-Role")
+        role = x_role.strip().lower() if x_role else "safety_lead"
+        if role not in ROLE_HIERARCHY and role not in {"safety_lead", "owner", "auditor"}:
+            role = "safety_lead"
         return UserSession(
-            user_id="anonymous",
-            role="admin",
+            user_id=f"user-{role}",
+            role=role,
             workspace_id="default-workspace",
             issued_at=time.time(),
             expires_at=time.time() + 86400,
@@ -148,12 +154,14 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> UserS
 
 
 async def get_principal(request: Request) -> Principal:
-    """Extract principal from Authorization header or return mock admin."""
-    auth_header = request.headers.get("Authorization")
-    if not auth_header:
-        return Principal(user_id="mock-admin-123", role="admin", status="active")
+    """Extract principal from X-Role header, Authorization bearer token, or default to safety_lead."""
+    x_role = request.headers.get("X-Role")
+    if x_role:
+        role = x_role.strip().lower()
+        return Principal(user_id=f"user-{role}", role=role, status="active")
 
-    if auth_header.startswith("Bearer "):
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
         try:
             session = verify_token(token)
@@ -161,7 +169,7 @@ async def get_principal(request: Request) -> Principal:
         except HTTPException:
             pass
 
-    return Principal(user_id="mock-user-123", role="admin", status="active")
+    return Principal(user_id="mock-safety-lead", role="safety_lead", status="active")
 
 
 def require_role(min_role: str) -> Callable:
