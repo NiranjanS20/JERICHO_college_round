@@ -44,17 +44,19 @@ class PolicyEngineDefense(Defense):
             if rule.check_type == "tool_allowlist":
                 allowed = rule.params.get("allowed_tools", [])
                 if tool_name not in allowed:
-                    return False, f"Blocked by {rule.id}: {rule.description}"
-                    
+                    return False, f"Blocked by {rule.id}: Tool {tool_name!r} is not in the allowed tools set. {rule.description}"
+
             elif rule.check_type == "email_domain" and tool_name == "send_email":
                 allowed_domain = rule.params.get("allowed_domain", "")
                 to_addr = str(args.get("to", "")).strip()
                 if not to_addr:
-                    return False, f"Blocked by {rule.id}: Missing recipient"
+                    return False, f"Blocked by {rule.id}: Missing recipient in send_email."
                 for r in to_addr.split(","):
                     r = r.strip()
-                    if "@" not in r or r.rsplit("@", 1)[1].lower() != allowed_domain:
-                        return False, f"Blocked by {rule.id}: {rule.description}"
+                    domain = r.rsplit("@", 1)[1].lower() if "@" in r else r
+                    if "@" not in r or domain != allowed_domain:
+                        return False, f"Blocked by {rule.id}: Outbound email to external domain {domain!r} is strictly forbidden. {rule.description}"
+
                         
             elif rule.check_type == "canary_leak":
                 target = rule.params.get("target")

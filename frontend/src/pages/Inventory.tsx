@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Shield, Tool, Cpu, Fingerprint } from 'lucide-react';
+import { Package, Shield, Wrench, Cpu, Fingerprint } from 'lucide-react';
 
 interface ComponentVersion {
   id: string;
@@ -23,7 +23,8 @@ export const Inventory: React.FC = () => {
 
   const typeIcons: Record<string, React.ReactNode> = {
     model: <Cpu className="w-4 h-4" />,
-    tool: <Tool className="w-4 h-4" />,
+    tool: <Wrench className="w-4 h-4" />,
+
     defense: <Shield className="w-4 h-4" />,
     dependency: <Package className="w-4 h-4" />
   };
