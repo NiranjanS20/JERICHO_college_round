@@ -96,6 +96,11 @@ app.include_router(integrity_router)
 
 
 
+from pathlib import Path
+from fastapi import HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
 @app.get("/api/health")
 async def health_check() -> dict[str, str]:
     """Basic health check endpoint."""
@@ -106,3 +111,29 @@ async def health_check() -> dict[str, str]:
         "attacker_model": settings.attacker_model,
         "demo_mode": str(settings.demo_mode),
     }
+
+
+# ── Frontend SPA & Landing page mount ────────────────────────────
+dist_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+landing_path = Path(__file__).resolve().parent.parent.parent / "landing.html"
+
+if dist_dir.exists():
+    assets_dir = dist_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/landing")
+    async def serve_landing():
+        if landing_path.exists():
+            return FileResponse(landing_path)
+        return FileResponse(dist_dir / "index.html")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        if full_path.startswith("api"):
+            raise HTTPException(status_code=404, detail="API endpoint not found")
+        file_path = dist_dir / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(dist_dir / "index.html")
+
