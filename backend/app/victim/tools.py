@@ -60,6 +60,22 @@ def set_session_id(session_id: str) -> None:
     _current_session_id = session_id
 
 
+# ── Sandbox Context & Execution Guard ──────────────────────────────
+_is_sandbox_executing: bool = False
+
+
+def set_sandbox_tool_executing(executing: bool) -> None:
+    """Set the state indicating tool execution is currently active in the sandbox."""
+    global _is_sandbox_executing
+    _is_sandbox_executing = executing
+
+
+def is_sandbox_tool_executing() -> bool:
+    """Check if tool execution is currently active in the sandbox."""
+    return _is_sandbox_executing
+
+
+
 def _get_memory_store() -> MemoryStore:
     """Return the MemoryStore for the active session."""
     if _current_session_id is None:

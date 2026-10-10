@@ -33,6 +33,8 @@ from app.api.users import router as users_router
 from app.api.findings import router as findings_router
 from app.api.validation import router as validation_router
 from app.api.approvals import router as approvals_router
+from app.api.auth import admin_router, router as auth_router
+
 
 
 @asynccontextmanager
@@ -79,6 +81,9 @@ app.include_router(users_router)
 app.include_router(findings_router)
 app.include_router(validation_router)
 app.include_router(approvals_router)
+app.include_router(auth_router)
+app.include_router(admin_router)
+
 
 
 @app.get("/api/health")

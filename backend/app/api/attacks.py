@@ -112,3 +112,80 @@ async def replay_attack(
 
     return db_replay
 
+
+
+# In-memory storage for counterfactual reports
+_COUNTERFACTUAL_REPORTS: dict[str, dict] = {}
+
+
+@router.post("/{attack_id}/counterfactual")
+async def run_counterfactual_analysis(
+    attack_id: str,
+    n_runs: int = Query(5, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+):
+    """Run counterfactual ablation analysis to localize the takeover point."""
+    stmt = (
+        select(Attack)
+        .options(selectinload(Attack.trace_steps))
+        .where(Attack.id == attack_id)
+    )
+    result = await db.execute(stmt)
+    attack = result.scalar_one_or_none()
+    if not attack:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Attack '{attack_id}' not found.",
+        )
+
+    trace_steps_data = [
+        {
+            "step_index": s.step_index,
+            "role": s.role,
+            "content": s.content,
+            "tool_name": s.tool_name,
+            "tool_args": s.tool_args,
+            "tool_result": s.tool_result,
+        }
+        for s in attack.trace_steps
+    ]
+
+    from app.traces.counterfactual import CounterfactualEngine
+    cf_engine = CounterfactualEngine()
+    report = await cf_engine.analyze(
+        attack_id=attack_id,
+        raw_payload=attack.payload,
+        trace_steps=trace_steps_data,
+        n_runs=n_runs,
+    )
+
+    report_dict = {
+        "attack_id": report.attack_id,
+        "baseline_n_runs": report.baseline_n_runs,
+        "baseline_successes": report.baseline_successes,
+        "baseline_success_rate": report.baseline_success_rate,
+        "baseline_ci_low": report.baseline_ci_low,
+        "baseline_ci_high": report.baseline_ci_high,
+        "elements": report.elements,
+        "ablations": report.ablations,
+        "takeover_elements": report.takeover_elements,
+        "takeover_step_index": report.takeover_step_index,
+        "minimal_cause_set": report.minimal_cause_set,
+        "confidence_label": report.confidence_label,
+        "disclaimer": report.disclaimer,
+    }
+    _COUNTERFACTUAL_REPORTS[attack_id] = report_dict
+    return report_dict
+
+
+@router.get("/{attack_id}/counterfactual")
+async def get_counterfactual_analysis(attack_id: str):
+    """Retrieve existing counterfactual report for an attack."""
+    report = _COUNTERFACTUAL_REPORTS.get(attack_id)
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No counterfactual analysis found for attack '{attack_id}'. Run POST first.",
+        )
+    return report
+

@@ -44,3 +44,19 @@ def setup_log_redaction() -> None:
     redactor = RedactingLogFilter()
     for handler in root_logger.handlers:
         handler.addFilter(redactor)
+
+
+GEMINI_KEY_PATTERN = re.compile(r"AIzaSy[A-Za-z0-9_-]+", re.IGNORECASE)
+
+
+
+def redact_secrets(text_or_obj: Any) -> Any:
+    """Recursively scrub API keys and sensitive credentials from logs and dicts."""
+    if isinstance(text_or_obj, str):
+        return GEMINI_KEY_PATTERN.sub("[REDACTED_API_KEY]", text_or_obj)
+    elif isinstance(text_or_obj, dict):
+        return {k: redact_secrets(v) for k, v in text_or_obj.items()}
+    elif isinstance(text_or_obj, list):
+        return [redact_secrets(item) for item in text_or_obj]
+    return text_or_obj
+
