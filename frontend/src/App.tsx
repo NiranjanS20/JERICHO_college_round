@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './pages/LandingPage';
+import { SignIn } from './pages/SignIn';
 import { Dashboard } from './pages/Dashboard';
 import { CampaignRunner } from './pages/CampaignRunner';
 import { Findings } from './pages/Findings';
@@ -103,7 +104,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#FFFAED] flex flex-col font-body text-[#132E4F] selection:bg-[#275992] selection:text-[#FFFAED]">
-      {currentTab !== 'home' && (
+      {currentTab !== 'home' && currentTab !== 'signin' && (
         <Navbar
           currentTab={currentTab}
           onTabChange={setCurrentTab}
@@ -119,6 +120,14 @@ export const App: React.FC = () => {
           onEnterApp={(tab) => setCurrentTab(tab || 'dashboard')}
           onLoadDemo={handleLoadDemo}
           isLoadingDemo={isLoadingDemo}
+        />
+      ) : currentTab === 'signin' ? (
+        <SignIn
+          onSignInSuccess={(role) => {
+            handleRoleChange(role);
+            setCurrentTab('dashboard');
+          }}
+          onBackToHome={() => setCurrentTab('home')}
         />
       ) : (
         <main className="flex-1 max-w-[1500px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -143,11 +152,21 @@ export const App: React.FC = () => {
               onNavigateToIntegrity={handleNavigateToIntegrity}
             />
           )}
-          {currentTab === 'findings' && <Findings attacks={attacks} />}
+          {currentTab === 'findings' && (
+            <Findings
+              attacks={attacks}
+              onNavigateToIntegrity={handleNavigateToIntegrity}
+            />
+          )}
           {currentTab === 'defenses' && <Defenses campaignId={activeCampaign?.id || null} />}
           {currentTab === 'validation' && <Validation />}
           {currentTab === 'approvals' && <Approvals />}
-          {currentTab === 'report' && <Report campaignId={activeCampaign?.id || null} />}
+          {currentTab === 'report' && (
+            <Report
+              campaignId={activeCampaign?.id || null}
+              onNavigateToIntegrity={handleNavigateToIntegrity}
+            />
+          )}
         </main>
       )}
 

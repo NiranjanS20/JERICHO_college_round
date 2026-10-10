@@ -23,12 +23,14 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
   const [isStreaming, setIsStreaming] = useState(false);
   const [eventsLog, setEventsLog] = useState<any[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedGraphId, setSelectedGraphId] = useState<string>('atk-canary-exfil');
   const [flowNodes, setFlowNodes] = useState<Node[]>([]);
   const [flowEdges, setFlowEdges] = useState<Edge[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   // Setup attack graph
   const loadGraph = async (attackId: string) => {
+    setSelectedGraphId(attackId);
     try {
       const graph: AttackGraph = await fetchTraceGraph(attackId);
       const rfNodes: Node[] = graph.nodes.map((n, i) => {
@@ -56,17 +58,17 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
 
         return {
           id: n.id,
-          position: { x: 200 * (i % 4), y: 130 * Math.floor(i / 4) + 40 },
+          position: { x: 230 * i + 40, y: 120 + (i % 2 === 1 ? 50 : 0) },
           data: {
             label: (
               <div className="p-2 text-left">
                 <div
-                  className="w-full h-1 rounded-full mb-1.5"
+                  className="w-full h-1.5 rounded-full mb-1.5"
                   style={{ backgroundColor: barColor }}
                 />
-                <div className="text-[11px] font-heading font-semibold text-textMain truncate">{n.label}</div>
-                <div className="text-[10px] text-textMain mt-1 line-clamp-2 font-mono">
-                  {(n.data.content || '').slice(0, 45)}...
+                <div className="text-[11px] font-heading font-bold text-textMain truncate">{n.label}</div>
+                <div className="text-[10px] text-textMain/80 mt-1 line-clamp-2 font-mono">
+                  {(n.data.content || '').slice(0, 50)}...
                 </div>
               </div>
             ),
@@ -74,11 +76,11 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
           style: {
             background: '#ffffff',
             color: '#0f172a',
-            border: `1.5px solid ${borderColor}`,
+            border: `2px solid ${borderColor}`,
             padding: 0,
             borderRadius: 12,
-            width: 170,
-            boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+            width: 190,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
           },
         };
       });
@@ -165,6 +167,10 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
       }
     }
   };
+
+  useEffect(() => {
+    loadGraph('atk-canary-exfil');
+  }, []);
 
   useEffect(() => {
     if (activeCampaign) {
@@ -277,15 +283,53 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
             </div>
             <div className="flex items-center gap-3 text-xs">
               <span className="flex items-center gap-1.5 font-medium text-textMain">
-                <span className="w-2.5 h-2.5 rounded-full bg-cardBg0"></span> Prompt
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span> Prompt
               </span>
               <span className="flex items-center gap-1.5 font-medium text-textMain">
-                <span className="w-2.5 h-2.5 rounded-full bg-appBg0"></span> Tool
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Tool
               </span>
               <span className="flex items-center gap-1.5 font-medium text-textMain">
-                <span className="w-2.5 h-2.5 rounded-full bg-cardBg0"></span> Breach
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Breach
               </span>
             </div>
+          </div>
+
+          {/* Trace Vector Selector Bar */}
+          <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-cardBorder text-xs">
+            <span className="text-textMain/70 font-semibold text-[11px]">Trace Vector:</span>
+            <button
+              onClick={() => loadGraph('atk-canary-exfil')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                selectedGraphId === 'atk-canary-exfil'
+                  ? 'bg-[#275992] text-white shadow-xs'
+                  : 'bg-cardBg border border-cardBorder text-textMain hover:bg-gray-100'
+              }`}
+            >
+              Canary Key Leak
+            </button>
+            <button
+              onClick={() => loadGraph('atk-doc-poison')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                selectedGraphId === 'atk-doc-poison'
+                  ? 'bg-[#275992] text-white shadow-xs'
+                  : 'bg-cardBg border border-cardBorder text-textMain hover:bg-gray-100'
+              }`}
+            >
+              Document Poisoning
+            </button>
+            <button
+              onClick={() => loadGraph('atk-email-forward')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                selectedGraphId === 'atk-email-forward'
+                  ? 'bg-[#275992] text-white shadow-xs'
+                  : 'bg-cardBg border border-cardBorder text-textMain hover:bg-gray-100'
+              }`}
+            >
+              Email Forwarding Exploit
+            </button>
+            <span className="ml-auto text-[10px] font-mono text-[#586D85]">
+              Active: {selectedGraphId}
+            </span>
           </div>
 
           <div className="flex-1 bg-appBg rounded-xl border border-cardBorder overflow-hidden relative">

@@ -37,6 +37,8 @@ export interface AttackSummary {
   partial_score: number;
   best_in_chain: boolean;
   created_at: string;
+  injection_point?: string;
+  payload?: string;
 }
 
 export interface AttackDetail extends AttackSummary {
@@ -73,7 +75,7 @@ export interface DefenseInfo {
   id: string;
   name: string;
   description: string;
-  enabled: boolean;
+  enabled?: boolean;
 }
 
 export interface EvalMatrixRow {
@@ -98,6 +100,7 @@ export interface MetricsSummary {
   avg_partial_score: number;
   category_breakdown: Record<string, { total: number; successful: number; asr: number }>;
   strategy_breakdown: Record<string, { total: number; successful: number; asr: number }>;
+  wilson_ci?: { low: number; high: number };
 }
 
 export interface GraphNode {

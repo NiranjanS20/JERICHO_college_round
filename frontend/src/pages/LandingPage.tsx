@@ -309,7 +309,7 @@ GET /api/reports/camp_8921b4e7?format=json
             </button>
 
             <button
-              onClick={() => onEnterApp('dashboard')}
+              onClick={() => onEnterApp('signin')}
               className="text-xs sm:text-sm font-semibold text-[#132E4F]/80 hover:text-[#275992] px-2 py-2 transition-colors"
             >
               Sign in
