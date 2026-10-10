@@ -148,6 +148,58 @@ async def read_memory() -> dict[str, Any]:
     data = await store.read_all()
     return _log("read_memory", {}, data)
 
+# ── Support mock tools ────────────────────────────────────────────────
+async def read_ticket(ticket_id: str) -> dict[str, Any]:
+    ticket = fake_data.get_ticket(ticket_id)
+    if not ticket:
+        return _log("read_ticket", {"ticket_id": ticket_id}, {"error": "Ticket not found."})
+    return _log("read_ticket", {"ticket_id": ticket_id}, ticket)
+
+# ── HR mock tools ───────────────────────────────────────────────────
+async def search_hr_policies(query: str) -> list[dict[str, Any]]:
+    query_lower = query.lower()
+    matches = [p for p in fake_data.HR_POLICIES if query_lower in p["title"].lower() or query_lower in p["content"].lower()]
+    return _log("search_hr_policies", {"query": query}, matches)
+
+async def get_employee_record(employee_id: str) -> dict[str, Any]:
+    for emp in fake_data.HR_EMPLOYEES:
+        if emp["id"] == employee_id:
+            return _log("get_employee_record", {"employee_id": employee_id}, emp)
+    return _log("get_employee_record", {"employee_id": employee_id}, {"error": "Employee not found."})
+
+async def get_employee_leave_summary(employee_id: str) -> dict[str, Any]:
+    for emp in fake_data.HR_EMPLOYEES:
+        if emp["id"] == employee_id:
+            return _log("get_employee_leave_summary", {"employee_id": employee_id}, {"leave_balance": emp["leave_balance"]})
+    return _log("get_employee_leave_summary", {"employee_id": employee_id}, {"error": "Employee not found."})
+
+# ── IT Ops mock tools ───────────────────────────────────────────────
+async def get_incident(incident_id: str) -> dict[str, Any]:
+    for inc in fake_data.IT_INCIDENTS:
+        if inc["id"] == incident_id:
+            return _log("get_incident", {"incident_id": incident_id}, inc)
+    return _log("get_incident", {"incident_id": incident_id}, {"error": "Incident not found."})
+
+async def search_asset_inventory(query: str) -> list[dict[str, Any]]:
+    matches = [a for a in fake_data.IT_ASSETS if query.lower() in a["hostname"].lower()]
+    return _log("search_asset_inventory", {"query": query}, matches)
+
+async def get_service_health(service_id: str) -> dict[str, Any]:
+    for svc in fake_data.IT_SERVICES:
+        if svc["id"] == service_id:
+            return _log("get_service_health", {"service_id": service_id}, svc)
+    return _log("get_service_health", {"service_id": service_id}, {"error": "Service not found."})
+
+async def restart_mock_service(service_id: str, approval_token: str = "") -> dict[str, Any]:
+    if not approval_token or approval_token not in fake_data.IT_APPROVALS:
+        return _log("restart_mock_service", {"service_id": service_id, "approval_token": approval_token}, {"error": "Unauthorized: Valid approval token required."})
+    return _log("restart_mock_service", {"service_id": service_id, "approval_token": approval_token}, {"status": "success", "message": f"Service {service_id} restarted."})
+
+async def change_mock_configuration(asset_id: str, new_config: str, approval_token: str = "") -> dict[str, Any]:
+    if not approval_token or approval_token not in fake_data.IT_APPROVALS:
+        return _log("change_mock_configuration", {"asset_id": asset_id, "new_config": new_config, "approval_token": approval_token}, {"error": "Unauthorized: Valid approval token required."})
+    return _log("change_mock_configuration", {"asset_id": asset_id, "new_config": new_config, "approval_token": approval_token}, {"status": "success", "message": f"Config changed for {asset_id}."})
+
 
 # ── Registry ────────────────────────────────────────────────────────
 
@@ -158,6 +210,15 @@ TOOL_REGISTRY: dict[str, Callable[..., Any]] = {
     "query_customer_db": query_customer_db,
     "write_memory": write_memory,
     "read_memory": read_memory,
+    "read_ticket": read_ticket,
+    "search_hr_policies": search_hr_policies,
+    "get_employee_record": get_employee_record,
+    "get_employee_leave_summary": get_employee_leave_summary,
+    "get_incident": get_incident,
+    "search_asset_inventory": search_asset_inventory,
+    "get_service_health": get_service_health,
+    "restart_mock_service": restart_mock_service,
+    "change_mock_configuration": change_mock_configuration,
 }
 
 # ── Gemini-compatible function declarations ─────────────────────────
@@ -259,6 +320,94 @@ def get_tool_declarations() -> list[types.Tool]:
                 type=types.Type.OBJECT,
                 properties={},
             ),
+        ),
+        types.FunctionDeclaration(
+            name="read_ticket",
+            description="Read a support ticket.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={"ticket_id": types.Schema(type=types.Type.STRING)},
+                required=["ticket_id"],
+            )
+        ),
+        types.FunctionDeclaration(
+            name="search_hr_policies",
+            description="Search HR policies.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={"query": types.Schema(type=types.Type.STRING)},
+                required=["query"],
+            )
+        ),
+        types.FunctionDeclaration(
+            name="get_employee_record",
+            description="Get employee record.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={"employee_id": types.Schema(type=types.Type.STRING)},
+                required=["employee_id"],
+            )
+        ),
+        types.FunctionDeclaration(
+            name="get_employee_leave_summary",
+            description="Get employee leave summary.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={"employee_id": types.Schema(type=types.Type.STRING)},
+                required=["employee_id"],
+            )
+        ),
+        types.FunctionDeclaration(
+            name="get_incident",
+            description="Get incident details.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={"incident_id": types.Schema(type=types.Type.STRING)},
+                required=["incident_id"],
+            )
+        ),
+        types.FunctionDeclaration(
+            name="search_asset_inventory",
+            description="Search asset inventory.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={"query": types.Schema(type=types.Type.STRING)},
+                required=["query"],
+            )
+        ),
+        types.FunctionDeclaration(
+            name="get_service_health",
+            description="Get service health.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={"service_id": types.Schema(type=types.Type.STRING)},
+                required=["service_id"],
+            )
+        ),
+        types.FunctionDeclaration(
+            name="restart_mock_service",
+            description="Restart a service. Requires approval.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "service_id": types.Schema(type=types.Type.STRING),
+                    "approval_token": types.Schema(type=types.Type.STRING),
+                },
+                required=["service_id"],
+            )
+        ),
+        types.FunctionDeclaration(
+            name="change_mock_configuration",
+            description="Change service configuration. Requires approval.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "asset_id": types.Schema(type=types.Type.STRING),
+                    "new_config": types.Schema(type=types.Type.STRING),
+                    "approval_token": types.Schema(type=types.Type.STRING),
+                },
+                required=["asset_id", "new_config"],
+            )
         ),
     ]
     return [types.Tool(function_declarations=declarations)]

@@ -37,6 +37,7 @@ import {
   fetchTraceGraph,
   killCampaign,
   fetchScenarios,
+  fetchCaseStudies,
   fetchDefenses,
   PreLaunchCheck,
   PreLaunchValidationResponse,
@@ -50,7 +51,7 @@ interface CampaignRunnerProps {
   onNavigate?: (page: string) => void;
 }
 
-type ConfigTab = 'target' | 'attack' | 'defenses' | 'limits';
+type ConfigTab = 'library' | 'target' | 'attack' | 'defenses' | 'limits';
 
 const ALL_AVAILABLE_TOOLS = [
   { id: 'read_email', label: 'read_email', desc: 'Read internal/external inbox' },
@@ -59,6 +60,15 @@ const ALL_AVAILABLE_TOOLS = [
   { id: 'send_email', label: 'send_email', desc: 'Dispatch outbound email' },
   { id: 'write_memory', label: 'write_memory', desc: 'Write to session memory store' },
   { id: 'read_memory', label: 'read_memory', desc: 'Read session memory store' },
+  { id: 'read_ticket', label: 'read_ticket', desc: 'Read a support ticket' },
+  { id: 'search_hr_policies', label: 'search_hr_policies', desc: 'Search HR policies' },
+  { id: 'get_employee_record', label: 'get_employee_record', desc: 'Get employee record' },
+  { id: 'get_employee_leave_summary', label: 'get_employee_leave_summary', desc: 'Get employee leave summary' },
+  { id: 'get_incident', label: 'get_incident', desc: 'Get incident details' },
+  { id: 'search_asset_inventory', label: 'search_asset_inventory', desc: 'Search asset inventory' },
+  { id: 'get_service_health', label: 'get_service_health', desc: 'Get service health' },
+  { id: 'restart_mock_service', label: 'restart_mock_service', desc: 'Restart a service' },
+  { id: 'change_mock_configuration', label: 'change_mock_configuration', desc: 'Change service config' },
 ];
 
 const DEFENSE_PRESETS: Record<string, { label: string; desc: string; layers: string[] }> = {
@@ -86,12 +96,16 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
   onNavigate,
 }) => {
   // Navigation / Mode
-  const [activeTab, setActiveTab] = useState<ConfigTab>('target');
+  const [activeTab, setActiveTab] = useState<ConfigTab>('library');
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [viewState, setViewState] = useState<'configure' | 'running' | 'results'>('configure');
 
+  // 0. Case Study Library
+  const [caseStudiesList, setCaseStudiesList] = useState<any[]>([]);
+  const [selectedCaseStudy, setSelectedCaseStudy] = useState<any | null>(null);
+
   // 1. Target Agent Configuration
-  const [targetModel, setTargetModel] = useState('gemini-2.0-flash');
+  const [targetModel, setTargetModel] = useState('gemini-3.8-flash');
   const [promptVersion, setPromptVersion] = useState('v1.2-sec-hardened');
   const [callerRole, setCallerRole] = useState('employee');
   const [permissionManifest, setPermissionManifest] = useState('support-employee-v1');
@@ -159,8 +173,26 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
       }
     }).catch(console.error);
 
+    fetchCaseStudies().then((list) => {
+      if (list && list.length > 0) {
+        setCaseStudiesList(list);
+      }
+    }).catch(console.error);
+
     loadGraph('atk-canary-exfil');
   }, []);
+
+  // Sync case study selection
+  const handleSelectCaseStudy = (cs: any) => {
+    setSelectedCaseStudy(cs);
+    setTargetModel(cs.target_model);
+    setPromptVersion(cs.system_prompt_version);
+    setCallerRole(cs.caller_role);
+    setEnabledTools(cs.available_tool_ids);
+    setPermissionManifest(cs.permission_manifest_id);
+    setSelectedScenarioId(cs.scenario_id);
+    setActiveTab('target');
+  };
 
   // Sync scenario selection to goal presets
   useEffect(() => {
@@ -190,7 +222,7 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
 
   // Construct current simulation config
   const getSimulationConfig = () => {
-    return {
+    const baseConfig = {
       schema_version: '1.0',
       target: {
         profile_id: 'support_copilot',
@@ -232,7 +264,7 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
       },
       sandbox: {
         data_mode: 'synthetic',
-        fixture_profile_id: 'support-demo-v1',
+        fixture_profile_id: selectedCaseStudy ? selectedCaseStudy.fixture_profile_id : 'support-demo-v1',
         fixture_seed: 20261011,
         canaries_enabled: true,
         external_network: false,
@@ -240,18 +272,26 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
         reset_before_run: true,
       },
     };
+    if (selectedCaseStudy) {
+      (baseConfig as any).case_study_id = selectedCaseStudy.id;
+      (baseConfig as any).case_study_version = selectedCaseStudy.version;
+    }
+    return baseConfig;
   };
 
-  // Re-run validation whenever config changes
+  // Re-run validation whenever config changes with debounce
   useEffect(() => {
     const config = getSimulationConfig();
-    validateSimulation(config)
-      .then((res) => {
-        setValidationResult(res);
-      })
-      .catch((err) => {
-        console.warn('Live validation warning:', err);
-      });
+    const timer = setTimeout(() => {
+      validateSimulation(config)
+        .then((res) => {
+          setValidationResult(res);
+        })
+        .catch((err) => {
+          console.warn('Live validation warning:', err);
+        });
+    }, 200);
+    return () => clearTimeout(timer);
   }, [
     targetModel,
     promptVersion,
@@ -543,8 +583,27 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
                 </span>
               </div>
 
-              {/* 4 Panels Grid / Nav */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* 5 Panels Grid / Nav */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <button
+                  onClick={() => setActiveTab('library')}
+                  className={`p-3.5 rounded-2xl text-left border transition-all ${
+                    activeTab === 'library'
+                      ? 'bg-white border-[#275992] shadow-sm ring-2 ring-[#275992]/10'
+                      : 'bg-[#FFFDF8] border-[#95A1D8]/20 hover:bg-white hover:border-[#95A1D8]/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-[#132E4F] flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-[#275992]" /> Library
+                    </span>
+                    {activeTab === 'library' && <span className="w-2 h-2 rounded-full bg-[#275992]" />}
+                  </div>
+                  <p className="text-[11px] text-[#586D85] line-clamp-2 leading-relaxed">
+                    Select a ready-made case study
+                  </p>
+                </button>
+
                 <button
                   onClick={() => setActiveTab('target')}
                   className={`p-3.5 rounded-2xl text-left border transition-all ${
@@ -623,6 +682,55 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
               </div>
             </div>
 
+            {/* Panel 0: Library */}
+            {activeTab === 'library' && (
+              <div className="p-6 sm:p-8 space-y-6 animate-in fade-in-50">
+                <h3 className="text-sm font-bold text-[#132E4F]">Case Study Library</h3>
+                <p className="text-xs text-[#586D85]">
+                  Select a pre-configured, end-to-end synthetic business scenario. This will automatically lock in the target model, system prompt, caller role, allowed toolset, and synthetic dataset context.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                  {caseStudiesList.map((cs) => (
+                    <div
+                      key={cs.id}
+                      onClick={() => handleSelectCaseStudy(cs)}
+                      className={`p-5 rounded-2xl border cursor-pointer transition-all ${
+                        selectedCaseStudy?.id === cs.id
+                          ? 'bg-[#275992]/5 border-[#275992] shadow-sm'
+                          : 'bg-white border-[#95A1D8]/30 hover:border-[#275992]/50 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold text-[#275992]">{cs.id}</span>
+                        {selectedCaseStudy?.id === cs.id && <CheckCircle2 className="w-4 h-4 text-[#275992]" />}
+                      </div>
+                      <h4 className="text-sm font-bold text-[#132E4F] mb-2">{cs.name}</h4>
+                      <p className="text-xs text-[#586D85] mb-4 h-12 overflow-hidden">{cs.description}</p>
+                      <div className="space-y-2 text-[11px]">
+                        <div className="flex justify-between">
+                          <span className="text-[#586D85]">Target:</span>
+                          <span className="font-mono font-bold text-[#132E4F]">{cs.target_model}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#586D85]">Role:</span>
+                          <span className="font-mono font-bold text-[#132E4F]">{cs.caller_role}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#586D85]">Fixture:</span>
+                          <span className="font-mono font-bold text-[#132E4F]">{cs.fixture_profile_id}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {caseStudiesList.length === 0 && (
+                    <div className="col-span-3 p-8 text-center text-[#586D85] bg-gray-50 rounded-2xl border border-gray-200">
+                      Loading case studies from backend...
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Panel 1: Target Agent */}
             {activeTab === 'target' && (
               <div className="p-6 sm:p-8 space-y-6 animate-in fade-in-50">
@@ -634,10 +742,11 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
                     <select
                       value={targetModel}
                       onChange={(e) => setTargetModel(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#95A1D8]/30 text-xs font-medium text-[#132E4F] focus:outline-none focus:ring-2 focus:ring-[#275992]/30"
+                      disabled={!!selectedCaseStudy}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#95A1D8]/30 text-xs font-medium text-[#132E4F] focus:outline-none focus:ring-2 focus:ring-[#275992]/30 disabled:opacity-60 disabled:bg-gray-100"
                     >
-                      <option value="gemini-2.0-flash">gemini-2.0-flash (Fast, function-calling default)</option>
-                      <option value="gemini-2.5-flash">gemini-2.5-flash (Enhanced Reasoning Benchmark)</option>
+                      <option value="gemini-3.8-flash">gemini-3.8-flash (Fast, function-calling default)</option>
+                      <option value="gemini-3.8-pro">gemini-3.8-pro (Enhanced Reasoning Benchmark)</option>
                       <option value="gpt-4o-mini">gpt-4o-mini (Mocked compatibility interface)</option>
                     </select>
                   </div>
@@ -651,7 +760,8 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
                         type="text"
                         value={promptVersion}
                         onChange={(e) => setPromptVersion(e.target.value)}
-                        className="flex-1 px-3.5 py-2.5 rounded-xl bg-white border border-[#95A1D8]/30 text-xs font-medium text-[#132E4F] focus:outline-none focus:ring-2 focus:ring-[#275992]/30"
+                        disabled={!!selectedCaseStudy}
+                        className="flex-1 px-3.5 py-2.5 rounded-xl bg-white border border-[#95A1D8]/30 text-xs font-medium text-[#132E4F] focus:outline-none focus:ring-2 focus:ring-[#275992]/30 disabled:opacity-60 disabled:bg-gray-100"
                       />
                       <span className="text-[10px] font-mono bg-gray-100 px-2.5 py-2 rounded-lg text-[#586D85]">
                         SHA: a8f3b...
@@ -666,7 +776,8 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
                     <select
                       value={callerRole}
                       onChange={(e) => setCallerRole(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#95A1D8]/30 text-xs font-medium text-[#132E4F] focus:outline-none focus:ring-2 focus:ring-[#275992]/30"
+                      disabled={!!selectedCaseStudy}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#95A1D8]/30 text-xs font-medium text-[#132E4F] focus:outline-none focus:ring-2 focus:ring-[#275992]/30 disabled:opacity-60 disabled:bg-gray-100"
                     >
                       <option value="employee">employee (Standard user with internal email &amp; document access)</option>
                       <option value="guest">guest (External untrusted user, strict allowlist)</option>
@@ -682,7 +793,8 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
                     <select
                       value={permissionManifest}
                       onChange={(e) => setPermissionManifest(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#95A1D8]/30 text-xs font-medium text-[#132E4F] focus:outline-none focus:ring-2 focus:ring-[#275992]/30"
+                      disabled={!!selectedCaseStudy}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#95A1D8]/30 text-xs font-medium text-[#132E4F] focus:outline-none focus:ring-2 focus:ring-[#275992]/30 disabled:opacity-60 disabled:bg-gray-100"
                     >
                       <option value="support-employee-v1">support-employee-v1 (Allowed: read_email, search_docs, query_db)</option>
                       <option value="restricted-viewer-v2">restricted-viewer-v2 (Read-only, no write side effects)</option>
@@ -701,8 +813,10 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
                       return (
                         <div
                           key={tool.id}
-                          onClick={() => toggleTool(tool.id)}
-                          className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
+                          onClick={() => { if (!selectedCaseStudy) toggleTool(tool.id) }}
+                          className={`p-3 rounded-xl border transition-all flex items-start gap-3 ${
+                            selectedCaseStudy ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
+                          } ${
                             isEnabled
                               ? 'bg-[#275992]/10 border-[#275992] text-[#132E4F]'
                               : 'bg-white border-gray-200 text-[#586D85] opacity-60'

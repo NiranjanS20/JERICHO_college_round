@@ -117,6 +117,7 @@ async def seed_database() -> None:
                     created_by="11111111-1111-1111-1111-111111111111",
                 )
                 session.add(t1)
+                await session.flush()
                 tv1 = TargetVersion(
                     id="a0000000-0000-0000-0000-000000000101",
                     target_id=t1.id,
@@ -143,6 +144,7 @@ async def seed_database() -> None:
                     name="Default Defense Stack",
                 )
                 session.add(dp1)
+                await session.flush()
                 dpv1 = DefenseProfileVersion(
                     id="d0000000-0000-0000-0000-000000000101",
                     defense_profile_id=dp1.id,
@@ -176,6 +178,7 @@ async def seed_database() -> None:
                     content_hash="hash_fixture_42",
                 )
                 session.add(fix1)
+                await session.flush()
                 session.add(
                     Canary(
                         id="c0000000-0000-0000-0000-000000000001",

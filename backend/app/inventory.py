@@ -14,7 +14,7 @@ class ComponentVersion:
     description: str
 
 COMPONENT_INVENTORY: list[ComponentVersion] = [
-    ComponentVersion("gemini-2.0-flash", "model", "Gemini 2.0 Flash", "latest", "Google DeepMind frontier model"),
+    ComponentVersion("gemini-3.8-flash", "model", "Gemini 3.8 Flash", "latest", "Google DeepMind frontier model"),
     ComponentVersion("read_email", "tool", "Read Email", "1.0", "Reads simulated emails"),
     ComponentVersion("send_email", "tool", "Send Email", "1.0", "Sends simulated emails"),
     ComponentVersion("search_docs", "tool", "Search Documents", "1.0", "Queries RAG knowledge base"),

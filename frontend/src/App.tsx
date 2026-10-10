@@ -10,7 +10,6 @@ const Report = lazy(() => import('./pages/Report').then(m => ({ default: m.Repor
 const Validation = lazy(() => import('./pages/Validation').then(m => ({ default: m.Validation })));
 const Approvals = lazy(() => import('./pages/Approvals').then(m => ({ default: m.Approvals })));
 const Scenarios = lazy(() => import('./pages/Scenarios').then(m => ({ default: m.Scenarios })));
-const Inventory = lazy(() => import('./pages/Inventory').then(m => ({ default: m.Inventory })));
 const Integrity = lazy(() => import('./pages/Integrity').then(m => ({ default: m.Integrity })));
 const Governance = lazy(() => import('./pages/Governance').then(m => ({ default: m.Governance })));
 import {
@@ -150,7 +149,6 @@ export const App: React.FC = () => {
               />
             )}
             {currentTab === 'scenarios' && <Scenarios />}
-            {currentTab === 'inventory' && <Inventory />}
             {currentTab === 'integrity' && <Integrity initialRunId={integrityRunId} />}
             {currentTab === 'governance' && <Governance />}
             {currentTab === 'runner' && (

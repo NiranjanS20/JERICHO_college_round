@@ -31,6 +31,7 @@ from app.services.findings import upsert_finding_from_attack
 from app.victim.agent import VictimAgent
 from app.victim.tools import TOOL_REGISTRY
 from app.scenarios.builtin import BUILTIN_SCENARIOS
+from app.scenarios.case_studies import CASE_STUDIES
 from app.attacker.engine import AdaptiveAttackEngine
 from app.defenses import DEFENSE_REGISTRY
 
@@ -195,6 +196,37 @@ async def validate_simulation(
             passed=True,
             message=f"Custom objective bound to deterministic Canary/Policy Oracle evaluator."
         ))
+
+    # 1.5 Case Study Validation
+    if payload.case_study_id:
+        case_study = next((c for c in CASE_STUDIES if c.id == payload.case_study_id), None)
+        if not case_study:
+            checks.append(PreLaunchCheck(
+                name="Case Study",
+                passed=False,
+                message=f"Case Study ID '{payload.case_study_id}' not found."
+            ))
+        elif case_study.version != payload.case_study_version:
+            checks.append(PreLaunchCheck(
+                name="Case Study",
+                passed=False,
+                message=f"Version mismatch for Case Study '{payload.case_study_id}'. Expected {case_study.version}, got {payload.case_study_version}."
+            ))
+        else:
+            checks.append(PreLaunchCheck(
+                name="Case Study",
+                passed=True,
+                message=f"Case Study '{case_study.name}' (v{case_study.version}) verified."
+            ))
+            
+            # Validate tools are in allowed list
+            invalid_tools = [t for t in payload.target.enabled_tools if t not in case_study.available_tool_ids]
+            if invalid_tools:
+                checks.append(PreLaunchCheck(
+                    name="Allowed Tools",
+                    passed=False,
+                    message=f"Tools not allowed by case study: {', '.join(invalid_tools)}"
+                ))
 
     # 2. The required tools and synthetic fixtures are available
     missing_tools = [t for t in payload.target.enabled_tools if t not in TOOL_REGISTRY]

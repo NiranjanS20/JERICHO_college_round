@@ -38,7 +38,7 @@ class TargetAgentConfig(StrictBaseModel):
     """Target agent victim under evaluation."""
     profile_id: str = "support_copilot"
     version_id: str = "v2.4.1-acme"
-    model_id: str = "gemini-2.0-flash"
+    model_id: str = "gemini-3.8-flash"
     system_prompt_version: str = "v1.2-sec-hardened"
     caller_role: str = "employee"
     permission_manifest_id: str = "support-employee-v1"
@@ -98,6 +98,8 @@ class SandboxConfig(StrictBaseModel):
 class SimulationConfig(StrictBaseModel):
     """Canonical single-source-of-truth configuration for a simulation run."""
     schema_version: str = "1.0"
+    case_study_id: str | None = None
+    case_study_version: str | None = None
     target: TargetAgentConfig = Field(default_factory=TargetAgentConfig)
     attack_plan: AttackPlanConfig = Field(default_factory=AttackPlanConfig)
     defenses: DefensesConfig = Field(default_factory=DefensesConfig)

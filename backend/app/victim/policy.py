@@ -127,6 +127,15 @@ ALLOWED_TOOLS: set[str] = {
     "query_customer_db",
     "write_memory",
     "read_memory",
+    "read_ticket",
+    "search_hr_policies",
+    "get_employee_record",
+    "get_employee_leave_summary",
+    "get_incident",
+    "search_asset_inventory",
+    "get_service_health",
+    "restart_mock_service",
+    "change_mock_configuration",
 }
 
 SENSITIVE_TOOLS: set[str] = {

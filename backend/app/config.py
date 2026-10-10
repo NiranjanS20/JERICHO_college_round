@@ -33,11 +33,11 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
 
     # Model names (swap without code changes)
-    victim_model: str = "gemini-2.0-flash"
-    attacker_model: str = "gemini-2.0-flash"
-    classifier_model: str = "gemini-2.0-flash"
-    model_judge_assist: str = "gemini-2.0-flash"
-    model_fix_suggester: str = "gemini-2.0-flash"
+    victim_model: str = "gemini-3.8-flash"
+    attacker_model: str = "gemini-3.8-flash"
+    classifier_model: str = "gemini-3.8-flash"
+    model_judge_assist: str = "gemini-3.8-flash"
+    model_fix_suggester: str = "gemini-3.8-flash"
 
     # ── Temperatures ────────────────────────────────────────────
     victim_temperature: float = 0.1

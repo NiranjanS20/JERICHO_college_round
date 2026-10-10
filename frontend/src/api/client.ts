@@ -86,6 +86,11 @@ export async function fetchScenarios() {
   return res.json();
 }
 
+export async function fetchCaseStudies() {
+  const res = await apiFetch(`${API_BASE}/scenarios/case-studies`);
+  return res.json();
+}
+
 export async function fetchCampaign(id: string): Promise<Campaign> {
   const res = await apiFetch(`${API_BASE}/campaigns/${id}`);
   return res.json();
