@@ -150,6 +150,7 @@ export const App: React.FC = () => {
               activeCampaign={activeCampaign}
               onCampaignCreated={handleCampaignCreated}
               onNavigateToIntegrity={handleNavigateToIntegrity}
+              onNavigate={(page) => setCurrentTab(page)}
             />
           )}
           {currentTab === 'findings' && (

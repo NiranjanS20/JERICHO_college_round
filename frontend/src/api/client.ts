@@ -91,11 +91,40 @@ export async function fetchCampaign(id: string): Promise<Campaign> {
   return res.json();
 }
 
+export interface PreLaunchCheck {
+  name: string;
+  passed: boolean;
+  message: string;
+}
+
+export interface PreLaunchValidationResponse {
+  valid: boolean;
+  config_hash: string;
+  checks: PreLaunchCheck[];
+  effective_config: Record<string, any>;
+  warnings: string[];
+}
+
+export async function validateSimulation(config: any): Promise<PreLaunchValidationResponse> {
+  const res = await apiFetch(`${API_BASE}/campaigns/validate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(errorBody.detail || `Validation failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function createCampaign(payload: {
-  goals: string[];
+  goals?: string[];
   categories?: string[];
   budget_per_goal?: number;
   defense_ids?: string[];
+  config_snapshot?: Record<string, any>;
+  simulation_config?: any;
 }): Promise<Campaign> {
   const res = await apiFetch(`${API_BASE}/campaigns`, {
     method: 'POST',
