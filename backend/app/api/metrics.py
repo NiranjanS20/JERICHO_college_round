@@ -76,8 +76,13 @@ async def get_metrics_summary(
     for strat_data in strategy_breakdown.values():
         strat_data["asr"] = round(strat_data["successful"] / strat_data["total"], 4) if strat_data["total"] > 0 else 0.0
 
+    camp_res = await db.execute(select(Campaign).where(Campaign.id == target_campaign_id))
+    camp_obj = camp_res.scalar_one_or_none()
+    camp_provenance = camp_obj.provenance if camp_obj else "sample"
+
     return MetricsSummaryResponse(
         campaign_id=target_campaign_id,
+        provenance=camp_provenance,
         total_attacks=total,
         successful_attacks=successful,
         failed_attacks=failed,
@@ -87,4 +92,5 @@ async def get_metrics_summary(
         category_breakdown=category_breakdown,
         strategy_breakdown=strategy_breakdown,
     )
+
 

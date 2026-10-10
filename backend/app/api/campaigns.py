@@ -214,7 +214,9 @@ async def create_campaign(
         budget_per_goal=payload.budget_per_goal,
         defense_ids=payload.defense_ids or [],
         config_snapshot=payload.config_snapshot or {},
+        provenance=payload.provenance,
     )
+
     db.add(campaign)
     await db.commit()
     await db.refresh(campaign)

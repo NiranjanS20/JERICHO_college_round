@@ -48,6 +48,9 @@ class Campaign(Base):
     status: Mapped[str] = mapped_column(
         String, default="pending"
     )  # pending | running | completed | failed
+    user_id: Mapped[str] = mapped_column(String, default="default-user")
+    workspace_id: Mapped[str] = mapped_column(String, default="default-workspace")
+    provenance: Mapped[str] = mapped_column(String, default="sample")  # real | sample
     goals: Mapped[list] = mapped_column(JSON, default=list)
     categories: Mapped[list] = mapped_column(JSON, default=list)
     budget_per_goal: Mapped[int] = mapped_column(Integer, default=10)

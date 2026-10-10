@@ -42,6 +42,7 @@ class CampaignCreate(StrictBaseModel):
     budget_per_goal: int = 10
     defense_ids: list[str] = Field(default_factory=list)
     config_snapshot: dict[str, Any] = Field(default_factory=dict)
+    provenance: str = "sample"
 
 
 class CampaignResponse(StrictBaseModel):
@@ -57,6 +58,8 @@ class CampaignResponse(StrictBaseModel):
     budget_per_goal: int
     defense_ids: list[str]
     config_snapshot: dict[str, Any]
+    provenance: str = "sample"
+
 
 
 # ───────────────────────────────────────────────────────────────
@@ -197,6 +200,7 @@ class MetricsSummaryResponse(StrictBaseModel):
     """Aggregated metrics for a campaign."""
 
     campaign_id: str
+    provenance: str = "sample"  # real | sample
     total_attacks: int = 0
     successful_attacks: int = 0
     failed_attacks: int = 0
@@ -205,6 +209,7 @@ class MetricsSummaryResponse(StrictBaseModel):
     avg_partial_score: float = 0.0
     category_breakdown: dict[str, dict[str, Any]] = Field(default_factory=dict)
     strategy_breakdown: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
 
 
 # ───────────────────────────────────────────────────────────────

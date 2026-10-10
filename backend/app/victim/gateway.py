@@ -51,9 +51,10 @@ class Gateway:
                 return {"error": "Pending human approval. " + reason}
             return {"error": f"Policy denied: {reason}"}
             
-        # 3. Execution (Simulation of socket guard and actual run)
+        # 3. Execution (Socket guard and actual run)
+        from app.victim.tools import set_sandbox_tool_executing
+        set_sandbox_tool_executing(True)
         try:
-            # Here we would enter a socket guard context
             if asyncio.iscoroutinefunction(tool_func):
                 result = await tool_func(**args)
             else:
@@ -70,3 +71,6 @@ class Gateway:
             return result
         except Exception as e:
             return {"error": f"Execution failed: {str(e)}"}
+        finally:
+            set_sandbox_tool_executing(False)
+

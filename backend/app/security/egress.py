@@ -46,3 +46,4 @@ def install_network_egress_guard() -> None:
         socket.socket.connect = _guarded_connect
         _egress_guard_installed = True
         logger.info("Sandbox network egress guard installed.")
+
