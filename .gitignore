@@ -34,6 +34,7 @@ build/
 # Databases & local state
 *.db
 *.sqlite3
+backend/demo_cache/
 
 # IDE & OS
 .DS_Store

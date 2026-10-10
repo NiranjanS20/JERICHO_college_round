@@ -12,11 +12,14 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+class StrictBaseModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
 
 # ───────────────────────────────────────────────────────────────
 # Oracle
 # ───────────────────────────────────────────────────────────────
-class OracleVerdict(BaseModel):
+class OracleVerdict(StrictBaseModel):
     """Classifier judgement on whether an attack succeeded."""
 
     success: bool = False
@@ -31,7 +34,7 @@ class OracleVerdict(BaseModel):
 # ───────────────────────────────────────────────────────────────
 # Campaign
 # ───────────────────────────────────────────────────────────────
-class CampaignCreate(BaseModel):
+class CampaignCreate(StrictBaseModel):
     """Payload for creating a new campaign."""
 
     goals: list[str]
@@ -41,10 +44,10 @@ class CampaignCreate(BaseModel):
     config_snapshot: dict[str, Any] = Field(default_factory=dict)
 
 
-class CampaignResponse(BaseModel):
+class CampaignResponse(StrictBaseModel):
     """Full campaign representation returned by the API."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     id: str
     created_at: datetime
@@ -59,10 +62,10 @@ class CampaignResponse(BaseModel):
 # ───────────────────────────────────────────────────────────────
 # TraceStep
 # ───────────────────────────────────────────────────────────────
-class TraceStepResponse(BaseModel):
+class TraceStepResponse(StrictBaseModel):
     """A single trace step in a conversation."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     id: str
     attack_id: str
@@ -79,10 +82,10 @@ class TraceStepResponse(BaseModel):
 # ───────────────────────────────────────────────────────────────
 # Attack
 # ───────────────────────────────────────────────────────────────
-class AttackSummaryResponse(BaseModel):
+class AttackSummaryResponse(StrictBaseModel):
     """Lightweight attack record for list views."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     id: str
     campaign_id: str
@@ -96,10 +99,10 @@ class AttackSummaryResponse(BaseModel):
     created_at: datetime
 
 
-class AttackResponse(BaseModel):
+class AttackResponse(StrictBaseModel):
     """Full attack record including trace steps and oracle verdict."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     id: str
     campaign_id: str
@@ -120,7 +123,7 @@ class AttackResponse(BaseModel):
 # ───────────────────────────────────────────────────────────────
 # Replay
 # ───────────────────────────────────────────────────────────────
-class ReplayRequest(BaseModel):
+class ReplayRequest(StrictBaseModel):
     """Request to statistically replay an attack."""
 
     attack_id: str
@@ -128,10 +131,10 @@ class ReplayRequest(BaseModel):
     defense_ids: list[str] = Field(default_factory=list)
 
 
-class ReplayResponse(BaseModel):
+class ReplayResponse(StrictBaseModel):
     """Statistical replay results."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     id: str
     attack_id: str
@@ -147,7 +150,7 @@ class ReplayResponse(BaseModel):
 # ───────────────────────────────────────────────────────────────
 # Defense evaluation
 # ───────────────────────────────────────────────────────────────
-class DefenseInfo(BaseModel):
+class DefenseInfo(StrictBaseModel):
     """Descriptor for a single defense layer."""
 
     id: str
@@ -156,14 +159,14 @@ class DefenseInfo(BaseModel):
     enabled: bool = True
 
 
-class DefenseEvalRequest(BaseModel):
+class DefenseEvalRequest(StrictBaseModel):
     """Request to evaluate a set of defenses against a campaign."""
 
     campaign_id: str
     defense_combos: list[list[str]]
 
 
-class EvalMatrixRequest(BaseModel):
+class EvalMatrixRequest(StrictBaseModel):
     """Request for a full evaluation matrix."""
 
     campaign_id: str
@@ -171,10 +174,10 @@ class EvalMatrixRequest(BaseModel):
     include_benign: bool = True
 
 
-class EvalMatrixResponse(BaseModel):
+class EvalMatrixResponse(StrictBaseModel):
     """One row of the defense evaluation matrix."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     id: str
     campaign_id: str
@@ -190,7 +193,7 @@ class EvalMatrixResponse(BaseModel):
 # ───────────────────────────────────────────────────────────────
 # Metrics
 # ───────────────────────────────────────────────────────────────
-class MetricsSummaryResponse(BaseModel):
+class MetricsSummaryResponse(StrictBaseModel):
     """Aggregated metrics for a campaign."""
 
     campaign_id: str
@@ -207,7 +210,7 @@ class MetricsSummaryResponse(BaseModel):
 # ───────────────────────────────────────────────────────────────
 # Attack graph (visualisation)
 # ───────────────────────────────────────────────────────────────
-class AttackGraphNode(BaseModel):
+class AttackGraphNode(StrictBaseModel):
     """A node in the attack-trace graph."""
 
     id: str
@@ -218,7 +221,7 @@ class AttackGraphNode(BaseModel):
     # is_malicious, step_index
 
 
-class AttackGraphEdge(BaseModel):
+class AttackGraphEdge(StrictBaseModel):
     """An edge in the attack-trace graph."""
 
     id: str
@@ -228,7 +231,7 @@ class AttackGraphEdge(BaseModel):
     label: str = ""
 
 
-class AttackGraphResponse(BaseModel):
+class AttackGraphResponse(StrictBaseModel):
     """Full attack-trace graph for visualisation."""
 
     nodes: list[AttackGraphNode] = Field(default_factory=list)
@@ -238,7 +241,7 @@ class AttackGraphResponse(BaseModel):
 # ───────────────────────────────────────────────────────────────
 # SSE event schemas
 # ───────────────────────────────────────────────────────────────
-class AttackStartedEvent(BaseModel):
+class AttackStartedEvent(StrictBaseModel):
     """Emitted when a new attack attempt begins."""
 
     event: str = "attack_started"
@@ -249,7 +252,7 @@ class AttackStartedEvent(BaseModel):
     iteration: int
 
 
-class StepEvent(BaseModel):
+class StepEvent(StrictBaseModel):
     """Emitted for each conversation step (message sent/received)."""
 
     event: str = "step"
@@ -259,7 +262,7 @@ class StepEvent(BaseModel):
     content: str
 
 
-class ToolCallEvent(BaseModel):
+class ToolCallEvent(StrictBaseModel):
     """Emitted when the victim agent calls a tool."""
 
     event: str = "tool_call"
@@ -271,7 +274,7 @@ class ToolCallEvent(BaseModel):
     is_malicious: bool = False
 
 
-class OracleVerdictEvent(BaseModel):
+class OracleVerdictEvent(StrictBaseModel):
     """Emitted when the oracle returns a judgement."""
 
     event: str = "oracle_verdict"
@@ -279,7 +282,7 @@ class OracleVerdictEvent(BaseModel):
     verdict: OracleVerdict
 
 
-class IterationScoreEvent(BaseModel):
+class IterationScoreEvent(StrictBaseModel):
     """Emitted after each iteration is scored."""
 
     event: str = "iteration_score"
@@ -289,7 +292,7 @@ class IterationScoreEvent(BaseModel):
     best_in_chain: bool
 
 
-class AttackFinishedEvent(BaseModel):
+class AttackFinishedEvent(StrictBaseModel):
     """Emitted when an attack attempt ends."""
 
     event: str = "attack_finished"

@@ -6,6 +6,8 @@ import { CampaignRunner } from './pages/CampaignRunner';
 import { Findings } from './pages/Findings';
 import { Defenses } from './pages/Defenses';
 import { Report } from './pages/Report';
+import { Validation } from './pages/Validation';
+import { Approvals } from './pages/Approvals';
 import {
   fetchCampaigns,
   fetchAttacks,
@@ -99,6 +101,8 @@ export const App: React.FC = () => {
           )}
           {currentTab === 'findings' && <Findings attacks={attacks} />}
           {currentTab === 'defenses' && <Defenses campaignId={activeCampaign?.id || null} />}
+          {currentTab === 'validation' && <Validation />}
+          {currentTab === 'approvals' && <Approvals />}
           {currentTab === 'report' && <Report campaignId={activeCampaign?.id || null} />}
         </main>
       )}

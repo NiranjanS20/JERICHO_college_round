@@ -7,7 +7,9 @@ import {
   CheckCircle2,
   Sparkles,
   ArrowRight,
-  Shield
+  Shield,
+  Beaker,
+  UserCheck
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -29,6 +31,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'runner', label: 'Campaign Runner', icon: Crosshair },
     { id: 'findings', label: 'Findings', icon: ShieldAlert },
     { id: 'defenses', label: 'Defenses', icon: CheckCircle2 },
+    { id: 'validation', label: 'Validation', icon: Beaker },
+    { id: 'approvals', label: 'Approvals', icon: UserCheck },
     { id: 'report', label: 'Report', icon: FileText },
   ];
 
