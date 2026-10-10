@@ -64,13 +64,22 @@ async def upsert_finding_from_attack(
     oracle_verdict: dict,
     run_id: str | None = None,
     breaking_seq: int | None = None,
+    scenario_id: str | None = None,
+    framework_mapping: dict[str, str] | None = None,
 ) -> Finding:
     """Create or update a finding in the DB from an oracle verdict."""
     root_cause_key = oracle_verdict.get("root_cause_key", "instruction_confusion")
     verdict_type = oracle_verdict.get("verdict", "error")
     is_success = (verdict_type == "success")
 
-    owasp_id, atlas_id = MAP_ROOT_CAUSE_TO_OWASP.get(root_cause_key, ("LLM01:2025", "AML.T0051"))
+    owasp_id = "LLM01:2025"
+    atlas_id = "AML.T0051"
+    
+    if framework_mapping:
+        owasp_id = framework_mapping.get("owasp", owasp_id)
+        atlas_id = framework_mapping.get("mitre_atlas", atlas_id)
+    else:
+        owasp_id, atlas_id = MAP_ROOT_CAUSE_TO_OWASP.get(root_cause_key, ("LLM01:2025", "AML.T0051"))
 
     # Impact, exploitability, reach heuristics
     impact = 4 if verdict_type == "success" else 2
@@ -141,14 +150,16 @@ class FindingsService:
     def __init__(self) -> None:
         self.findings: list[dict[str, Any]] = []
         
-    def record_finding(self, campaign_id: str, attack_id: str, severity: str, details: dict[str, Any]) -> str:
+    def record_finding(self, campaign_id: str, attack_id: str, severity: str, details: dict[str, Any], scenario_id: str | None = None, framework_mapping: dict[str, str] | None = None) -> str:
         finding_id = str(uuid.uuid4())
         self.findings.append({
             "id": finding_id,
             "campaign_id": campaign_id,
             "attack_id": attack_id,
             "severity": severity,
-            "details": details
+            "details": details,
+            "scenario_id": scenario_id,
+            "framework_mapping": framework_mapping or {}
         })
         return finding_id
         

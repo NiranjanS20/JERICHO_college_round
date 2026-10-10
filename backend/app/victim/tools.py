@@ -114,15 +114,19 @@ async def query_customer_db(query: str) -> list[dict[str, Any]]:
     return _log("query_customer_db", {"query": query}, matches)
 
 
-async def write_memory(key: str, value: str) -> dict[str, str]:
+async def write_memory(key: str, value: str) -> dict[str, Any]:
     """Write a key-value pair to the session memory store."""
     store = _get_memory_store()
-    await store.write(key, value)
+    write_result = await store.write(key, value)
+    
+    if write_result.get("error"):
+        return _log("write_memory", {"key": key, "value": value}, write_result)
+        
     result: dict[str, str] = {"status": "written", "key": key}
     return _log("write_memory", {"key": key, "value": value}, result)
 
 
-async def read_memory() -> dict[str, str]:
+async def read_memory() -> dict[str, Any]:
     """Read all entries from the session memory store."""
     store = _get_memory_store()
     data = await store.read_all()

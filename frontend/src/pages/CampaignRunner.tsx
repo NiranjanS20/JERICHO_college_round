@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactFlow, { Background, Controls, Node, Edge } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Play, RefreshCw, AlertCircle, Terminal, Layers, ArrowRight } from 'lucide-react';
-import { createCampaign, fetchTraceGraph } from '../api/client';
+import { Play, RefreshCw, AlertCircle, Terminal, Layers, ArrowRight, XOctagon } from 'lucide-react';
+import { createCampaign, fetchTraceGraph, killCampaign } from '../api/client';
 import { Campaign, AttackGraph } from '../types';
 
 interface CampaignRunnerProps {
@@ -145,6 +145,20 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
     }
   };
 
+  const handleKillCampaign = async () => {
+    if (activeCampaign) {
+      try {
+        await killCampaign(activeCampaign.id);
+        setIsStreaming(false);
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+        }
+      } catch (err) {
+        console.error('Failed to kill campaign:', err);
+      }
+    }
+  };
+
   useEffect(() => {
     if (activeCampaign) {
       startLiveStream(activeCampaign.id);
@@ -202,23 +216,33 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
               {activeCampaign?.id || 'None'}
             </span>
           </div>
-          <button
-            onClick={handleLaunchCampaign}
-            disabled={isStreaming}
-            className="px-5 py-2.5 bg-charcoal hover:bg-charcoal/90 disabled:opacity-50 text-textMain rounded-xl text-xs font-semibold flex items-center gap-2   transition-all"
-          >
-            {isStreaming ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                Adaptive Loop Running...
-              </>
-            ) : (
-              <>
-                <Play className="w-3.5 h-3.5" />
-                Start Adaptive Attack
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleKillCampaign}
+              disabled={!isStreaming}
+              className="px-5 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all"
+            >
+              <XOctagon className="w-3.5 h-3.5" />
+              Emergency Stop
+            </button>
+            <button
+              onClick={handleLaunchCampaign}
+              disabled={isStreaming}
+              className="px-5 py-2.5 bg-charcoal hover:bg-charcoal/90 disabled:opacity-50 text-textMain rounded-xl text-xs font-semibold flex items-center gap-2   transition-all"
+            >
+              {isStreaming ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  Adaptive Loop Running...
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5" />
+                  Start Adaptive Attack
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 

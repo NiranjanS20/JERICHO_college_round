@@ -27,6 +27,7 @@ from app.config import BudgetExhaustedError, get_budget, get_settings
 from app.oracle.oracle import Oracle, OracleVerdict
 from app.traces.recorder import TraceRecorder
 from app.victim.agent import AgentResult, VictimAgent
+from app.security.leak_scanner import LeakScanner
 
 logger = logging.getLogger(__name__)
 
@@ -137,22 +138,38 @@ class AdaptiveAttackEngine:
             # 2. Execute against victim agent
             victim = VictimAgent(defenses=defenses)
             agent_result = await victim.run(payload)
+            
+            # Update recorder config versions
+            recorder.config_version = agent_result.config_version
+            recorder.policy_version = agent_result.policy_version
 
             # Record agent trace steps
             step_base = iteration * 10
-            for idx, call in enumerate(agent_result.tool_calls):
+            leak_scanner = LeakScanner()
+            current_step = step_base
+            for call in agent_result.tool_calls:
+                current_step += 1
                 recorder.record_tool_call(
                     tool_name=call.tool_name,
                     args=call.args,
                     result=call.result,
-                    step_index=step_base + idx + 1,
+                    step_index=current_step,
                 )
+                report = leak_scanner.scan_data(call.result, channel=call.tool_name)
+                if report.leaked and report.canary_id and report.snippet:
+                    current_step += 1
+                    recorder.record_leak(report.canary_id, report.channel, report.snippet, current_step)
 
+            current_step += 1
             recorder.record_message(
                 role="assistant",
                 content=agent_result.final_answer,
-                step_index=step_base + len(agent_result.tool_calls) + 1,
+                step_index=current_step,
             )
+            report = leak_scanner.scan_text(agent_result.final_answer, channel="final_answer")
+            if report.leaked and report.canary_id and report.snippet:
+                current_step += 1
+                recorder.record_leak(report.canary_id, report.channel, report.snippet, current_step)
 
             # 3. Evaluate with Deterministic Oracle
             messages_for_oracle = [

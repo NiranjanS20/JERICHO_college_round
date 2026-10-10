@@ -31,6 +31,11 @@ export async function fetchCampaigns(): Promise<Campaign[]> {
   return res.json();
 }
 
+export async function fetchScenarios() {
+  const res = await fetch(`${API_BASE}/scenarios`);
+  return res.json();
+}
+
 export async function fetchCampaign(id: string): Promise<Campaign> {
   const res = await fetch(`${API_BASE}/campaigns/${id}`);
   return res.json();
@@ -150,6 +155,13 @@ export async function approveAction(approvalId: string) {
 
 export async function rejectAction(approvalId: string) {
   const res = await fetch(`${API_BASE}/approvals/${approvalId}/reject`, {
+    method: 'POST',
+  });
+  return res.json();
+}
+
+export async function killCampaign(campaignId: string) {
+  const res = await fetch(`${API_BASE}/campaigns/${campaignId}/kill`, {
     method: 'POST',
   });
   return res.json();

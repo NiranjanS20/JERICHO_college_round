@@ -33,6 +33,11 @@ from app.api.users import router as users_router
 from app.api.findings import router as findings_router
 from app.api.validation import router as validation_router
 from app.api.approvals import router as approvals_router
+from app.api.scenarios import router as scenarios_router
+from app.api.inventory import router as inventory_router
+from app.api.governance import router as governance_router
+from app.api.killswitch import router as killswitch_router
+from app.api.integrity import router as integrity_router
 
 
 @asynccontextmanager
@@ -79,6 +84,11 @@ app.include_router(users_router)
 app.include_router(findings_router)
 app.include_router(validation_router)
 app.include_router(approvals_router)
+app.include_router(scenarios_router)
+app.include_router(inventory_router)
+app.include_router(governance_router)
+app.include_router(killswitch_router)
+app.include_router(integrity_router)
 
 
 @app.get("/api/health")

@@ -35,6 +35,9 @@ class TraceStep:
     tool_result: Any = None
     is_malicious: bool = False
     verdict: dict[str, Any] | None = None  # for verdict step
+    canary_id: str | None = None  # for leak events
+    channel: str | None = None    # for leak events
+    snippet: str | None = None    # for leak events
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serialisable dictionary."""
@@ -100,9 +103,12 @@ class TraceRecorder:
         Unique identifier for the attack run this trace belongs to.
     """
 
-    def __init__(self, attack_id: str, run_id: str | None = None) -> None:
+    def __init__(self, attack_id: str, run_id: str | None = None, scenario_id: str | None = None, config_version: str | None = None, policy_version: str | None = None) -> None:
         self.attack_id = attack_id
         self.run_id = run_id or attack_id
+        self.scenario_id = scenario_id
+        self.config_version = config_version
+        self.policy_version = policy_version
         self._steps: list[TraceStep] = []
         self._verdict: OracleVerdict | None = None
         self._head_hash: str = "0" * 64
@@ -159,6 +165,20 @@ class TraceRecorder:
             )
         )
 
+    def record_leak(self, canary_id: str, channel: str, snippet: str, step_index: int) -> None:
+        """Record a data exfiltration event."""
+        self._steps.append(
+            TraceStep(
+                step_index=step_index,
+                timestamp=_now_iso(),
+                kind="leak_detected",
+                canary_id=canary_id,
+                channel=channel,
+                snippet=snippet,
+                is_malicious=True
+            )
+        )
+
     # ── query API ─────────────────────────────────────────────────
 
     def get_trace_steps(self) -> list[dict[str, Any]]:
@@ -181,11 +201,28 @@ class TraceRecorder:
             node_type = _classify_node(step)
             label = _node_label(step)
 
+            node_data = {
+                "step_index": step.step_index,
+                "kind": step.kind,
+            }
+            if step.content is not None:
+                node_data["content"] = step.content
+            if step.tool_name is not None:
+                node_data["tool_name"] = step.tool_name
+            if step.tool_args is not None:
+                node_data["tool_args"] = step.tool_args
+            if step.tool_result is not None:
+                node_data["tool_result"] = step.tool_result
+            if step.snippet is not None:
+                node_data["snippet"] = step.snippet
+            if step.canary_id is not None:
+                node_data["canary_id"] = step.canary_id
+
             node = GraphNode(
                 id=node_id,
                 type=node_type,
                 label=label,
-                data={"step_index": step.step_index, "kind": step.kind},
+                data=node_data,
             )
             nodes.append(node)
 
@@ -282,6 +319,9 @@ class TraceRecorder:
         payload: dict[str, Any] = {
             "attack_id": self.attack_id,
             "run_id": self.run_id,
+            "scenario_id": self.scenario_id,
+            "config_version": self.config_version,
+            "policy_version": self.policy_version,
             "steps": self.get_trace_steps(),
             "head_hash": self._head_hash,
         }
@@ -293,7 +333,13 @@ class TraceRecorder:
     def from_json(cls, data: str) -> TraceRecorder:
         """Deserialise a JSON string into a TraceRecorder."""
         payload = json.loads(data)
-        recorder = cls(attack_id=payload["attack_id"], run_id=payload.get("run_id"))
+        recorder = cls(
+            attack_id=payload["attack_id"], 
+            run_id=payload.get("run_id"),
+            scenario_id=payload.get("scenario_id"),
+            config_version=payload.get("config_version"),
+            policy_version=payload.get("policy_version")
+        )
 
         for raw_step in payload.get("steps", []):
             step = TraceStep(
@@ -307,6 +353,9 @@ class TraceRecorder:
                 tool_result=raw_step.get("tool_result"),
                 is_malicious=raw_step.get("is_malicious", False),
                 verdict=raw_step.get("verdict"),
+                canary_id=raw_step.get("canary_id"),
+                channel=raw_step.get("channel"),
+                snippet=raw_step.get("snippet"),
             )
             recorder._steps.append(step)
 
@@ -328,6 +377,9 @@ def _now_iso() -> str:
 
 def _classify_node(step: TraceStep) -> str:
     """Map a trace step to a React Flow node type."""
+    if step.kind == "leak_detected":
+        return "leak"
+
     if step.is_malicious:
         return "leak"
 
