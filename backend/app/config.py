@@ -2,8 +2,8 @@
 Application configuration.
 
 All settings are read from environment variables / .env file.
-Model names, API keys, and operational parameters are fully configurable
-without code changes.
+Model names, API keys, operational parameters, Supabase database URLs,
+and security seal keys are fully configurable without code changes.
 """
 
 from __future__ import annotations
@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     victim_model: str = "gemini-2.0-flash"
     attacker_model: str = "gemini-2.0-flash"
     classifier_model: str = "gemini-2.0-flash"
+    model_judge_assist: str = "gemini-2.0-flash"
+    model_fix_suggester: str = "gemini-2.0-flash"
 
     # ── Temperatures ────────────────────────────────────────────
     victim_temperature: float = 0.1
@@ -52,8 +54,13 @@ class Settings(BaseSettings):
     retry_base_delay: float = 1.0      # seconds, doubles each retry
     rate_limit_rpm: int = 15           # requests per minute guard
 
-    # ── Database ────────────────────────────────────────────────
+    # ── Supabase & Database Settings ───────────────────────────
+    supabase_url: str = ""
+    supabase_jwks_url: str = ""
     database_url: str = "sqlite+aiosqlite:///./agentbreak.db"
+    database_url_direct: str = ""
+    trace_seal_key: str = "agentbreak_default_seal_secret_key_2026"
+    cors_origins: str = "*"
 
     # ── Demo mode ───────────────────────────────────────────────
     demo_mode: bool = False
