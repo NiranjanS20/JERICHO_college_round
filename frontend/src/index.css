@@ -1,0 +1,165 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: #FFFAED;
+    color: #132E4F;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: #132E4F;
+    letter-spacing: -0.025em;
+  }
+}
+
+.font-heading {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.03em;
+}
+.font-body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Stripe-style animated gradient mesh */
+@keyframes meshDrift {
+  0% {
+    transform: translate(0%, 0%) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate(3%, 4%) scale(1.08) rotate(4deg);
+  }
+  66% {
+    transform: translate(-3%, 2%) scale(0.96) rotate(-3deg);
+  }
+  100% {
+    transform: translate(0%, 0%) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes meshWave {
+  0% {
+    opacity: 0.65;
+    transform: scale(1) translate(0px, 0px);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.05) translate(15px, -10px);
+  }
+  100% {
+    opacity: 0.65;
+    transform: scale(1) translate(0px, 0px);
+  }
+}
+
+.animate-mesh-drift {
+  animation: meshDrift 22s ease-in-out infinite;
+}
+
+.animate-mesh-wave {
+  animation: meshWave 16s ease-in-out infinite alternate;
+}
+
+/* Floating cards */
+@keyframes floatGentle1 {
+  0%, 100% { transform: translateY(0px) rotate(-1deg); }
+  50% { transform: translateY(-8px) rotate(0.5deg); }
+}
+@keyframes floatGentle2 {
+  0%, 100% { transform: translateY(0px) rotate(2deg); }
+  50% { transform: translateY(-11px) rotate(0deg); }
+}
+@keyframes floatGentle3 {
+  0%, 100% { transform: translateY(0px) rotate(-2deg); }
+  50% { transform: translateY(-7px) rotate(-0.5deg); }
+}
+
+.animate-float-1 {
+  animation: floatGentle1 7s ease-in-out infinite;
+}
+.animate-float-2 {
+  animation: floatGentle2 8.5s ease-in-out infinite;
+}
+.animate-float-3 {
+  animation: floatGentle3 6s ease-in-out infinite;
+}
+
+/* Flowing line dashes */
+@keyframes dashFlow {
+  to {
+    stroke-dashoffset: -32;
+  }
+}
+.animate-dash-flow {
+  stroke-dasharray: 6 6;
+  animation: dashFlow 1.8s linear infinite;
+}
+
+/* Subtle coral pulse */
+@keyframes coralPulse {
+  0%, 100% {
+    opacity: 0.9;
+    box-shadow: 0 0 12px 2px rgba(224, 109, 83, 0.4);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 22px 6px rgba(224, 109, 83, 0.75);
+  }
+}
+.animate-coral-pulse {
+  animation: coralPulse 2.4s ease-in-out infinite;
+}
+
+/* Glass card styling */
+.stripe-glass-card {
+  background: rgba(255, 253, 248, 0.82);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 18px 45px -12px rgba(149, 161, 216, 0.22), 0 2px 6px rgba(39, 89, 146, 0.04);
+}
+
+.stripe-glass-card:hover {
+  box-shadow: 0 24px 55px -12px rgba(149, 161, 216, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.95) inset;
+}
+
+/* React Flow styling */
+.react-flow__renderer {
+  background-color: #FFFAED !important;
+}
+.react-flow__node {
+  border-radius: 14px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  box-shadow: 0 4px 12px rgba(149, 161, 216, 0.15);
+  border: 1px solid #EFE5D2 !important;
+  background: #FFFDF8;
+  color: #132E4F;
+}
+.react-flow__controls {
+  box-shadow: 0 2px 8px rgba(149, 161, 216, 0.15);
+  border-radius: 10px;
+  border: 1px solid #EFE5D2;
+  background-color: #FFFDF8 !important;
+}
+
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: #FFFAED; }
+::-webkit-scrollbar-thumb { background: #E2D7C3; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #95A1D8; }
+
+.custom-scrollbar::-webkit-scrollbar { width: 5px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #E8DECC; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #95A1D8; }

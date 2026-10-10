@@ -1,0 +1,125 @@
+import React, { useState, useEffect } from 'react';
+import { Navbar } from './components/Navbar';
+import { LandingPage } from './pages/LandingPage';
+import { Dashboard } from './pages/Dashboard';
+import { CampaignRunner } from './pages/CampaignRunner';
+import { Findings } from './pages/Findings';
+import { Defenses } from './pages/Defenses';
+import { Report } from './pages/Report';
+import {
+  fetchCampaigns,
+  fetchAttacks,
+  fetchMetricsSummary,
+  loadDemoCampaign,
+} from './api/client';
+import { Campaign, AttackSummary, MetricsSummary } from './types';
+
+export const App: React.FC = () => {
+  const [currentTab, setCurrentTab] = useState<string>('home');
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(null);
+  const [attacks, setAttacks] = useState<AttackSummary[]>([]);
+  const [metrics, setMetrics] = useState<MetricsSummary | null>(null);
+  const [isLoadingDemo, setIsLoadingDemo] = useState(false);
+
+  useEffect(() => {
+    refreshAllData();
+  }, []);
+
+  const refreshAllData = async () => {
+    try {
+      const campList = await fetchCampaigns();
+      setCampaigns(campList);
+
+      const latestCamp = campList[0] || null;
+      setActiveCampaign(latestCamp);
+
+      const atkList = await fetchAttacks(latestCamp?.id);
+      setAttacks(atkList);
+
+      const m = await fetchMetricsSummary(latestCamp?.id);
+      setMetrics(m);
+    } catch (e) {
+      console.error('Failed to load initial data:', e);
+    }
+  };
+
+  const handleLoadDemo = async () => {
+    setIsLoadingDemo(true);
+    try {
+      await loadDemoCampaign();
+      await refreshAllData();
+      setCurrentTab('dashboard');
+    } catch (e) {
+      console.error('Failed to load demo:', e);
+    } finally {
+      setIsLoadingDemo(false);
+    }
+  };
+
+  const handleCampaignCreated = (newCamp: Campaign) => {
+    setCampaigns((prev) => [newCamp, ...prev]);
+    setActiveCampaign(newCamp);
+    refreshAllData();
+  };
+
+  return (
+    <div className="min-h-screen bg-[#FFFAED] flex flex-col font-body text-[#132E4F] selection:bg-[#275992] selection:text-[#FFFAED]">
+      {currentTab !== 'home' && (
+        <Navbar
+          currentTab={currentTab}
+          onTabChange={setCurrentTab}
+          onLoadDemo={handleLoadDemo}
+          isLoadingDemo={isLoadingDemo}
+        />
+      )}
+
+      {currentTab === 'home' ? (
+        <LandingPage
+          onEnterApp={(tab) => setCurrentTab(tab || 'dashboard')}
+          onLoadDemo={handleLoadDemo}
+          isLoadingDemo={isLoadingDemo}
+        />
+      ) : (
+        <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {currentTab === 'dashboard' && (
+            <Dashboard
+              metrics={metrics}
+              attacks={attacks}
+              campaign={activeCampaign}
+              onNavigate={(page) => setCurrentTab(page)}
+              onLoadDemo={handleLoadDemo}
+            />
+          )}
+          {currentTab === 'runner' && (
+            <CampaignRunner
+              activeCampaign={activeCampaign}
+              onCampaignCreated={handleCampaignCreated}
+            />
+          )}
+          {currentTab === 'findings' && <Findings attacks={attacks} />}
+          {currentTab === 'defenses' && <Defenses campaignId={activeCampaign?.id || null} />}
+          {currentTab === 'report' && <Report campaignId={activeCampaign?.id || null} />}
+        </main>
+      )}
+
+      {currentTab !== 'home' && (
+        <footer className="border-t border-[#95A1D8]/20 bg-[#F5EEDB]/60 py-8 text-center text-xs text-[#586D85] font-medium">
+          <div className="max-w-[1400px] mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-[#275992] flex items-center justify-center text-white">
+                <span className="text-[10px] font-bold">A</span>
+              </div>
+              <strong className="text-[#132E4F]">AgentBreak</strong> • Autonomous Red-Team Telemetry Suite
+            </div>
+            <div className="text-[#586D85]">
+              Acme Corp Defensive Security Research • Objective Sandboxed Verification
+            </div>
+          </div>
+        </footer>
+      )}
+    </div>
+  );
+};
+
+export default App;
