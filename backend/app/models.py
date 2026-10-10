@@ -183,7 +183,7 @@ class Attack(Base):
     __tablename__ = "attacks"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
-    campaign_id: Mapped[str] = mapped_column(String, ForeignKey("campaigns.id"), nullable=False)
+    campaign_id: Mapped[str] = mapped_column(String, ForeignKey("campaigns.id"), nullable=False, index=True)
     iteration: Mapped[int] = mapped_column(Integer, nullable=False)
     beam_depth: Mapped[int] = mapped_column(Integer, default=1)
     parent_attack_id: Mapped[str | None] = mapped_column(String, ForeignKey("attacks.id"), nullable=True)
@@ -214,7 +214,7 @@ class Run(Base):
     __tablename__ = "runs"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
-    attack_id: Mapped[str | None] = mapped_column(String, ForeignKey("attacks.id"), nullable=True)
+    attack_id: Mapped[str | None] = mapped_column(String, ForeignKey("attacks.id"), nullable=True, index=True)
     kind: Mapped[str] = mapped_column(String, default="live") # live | replay | rerun | validation | regression
     target_version_id: Mapped[str | None] = mapped_column(String, ForeignKey("target_versions.id"), nullable=True)
     defense_profile_version_id: Mapped[str | None] = mapped_column(String, ForeignKey("defense_profile_versions.id"), nullable=True)
@@ -237,7 +237,7 @@ class Event(Base):
     __tablename__ = "events"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
-    run_id: Mapped[str] = mapped_column(String, ForeignKey("runs.id"), nullable=False)
+    run_id: Mapped[str] = mapped_column(String, ForeignKey("runs.id"), nullable=False, index=True)
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
     ts: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     event_type: Mapped[str] = mapped_column(String, nullable=False)
@@ -302,7 +302,7 @@ class TraceStep(Base):
     __tablename__ = "trace_steps"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
-    attack_id: Mapped[str] = mapped_column(String, ForeignKey("attacks.id"), nullable=False)
+    attack_id: Mapped[str] = mapped_column(String, ForeignKey("attacks.id"), nullable=False, index=True)
     step_index: Mapped[int] = mapped_column(Integer, nullable=False)
     role: Mapped[str] = mapped_column(String, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)

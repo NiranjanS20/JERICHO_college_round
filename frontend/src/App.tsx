@@ -1,17 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Navbar } from './components/Navbar';
-import { LandingPage } from './pages/LandingPage';
-import { SignIn } from './pages/SignIn';
-import { Dashboard } from './pages/Dashboard';
-import { CampaignRunner } from './pages/CampaignRunner';
-import { Findings } from './pages/Findings';
-import { Defenses } from './pages/Defenses';
-import { Report } from './pages/Report';
-import { Validation } from './pages/Validation';
-import { Approvals } from './pages/Approvals';
-import { Scenarios } from './pages/Scenarios';
-import { Integrity } from './pages/Integrity';
-import { Governance } from './pages/Governance';
+const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage })));
+const SignIn = lazy(() => import('./pages/SignIn').then(m => ({ default: m.SignIn })));
+const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const CampaignRunner = lazy(() => import('./pages/CampaignRunner').then(m => ({ default: m.CampaignRunner })));
+const Findings = lazy(() => import('./pages/Findings').then(m => ({ default: m.Findings })));
+const Defenses = lazy(() => import('./pages/Defenses').then(m => ({ default: m.Defenses })));
+const Report = lazy(() => import('./pages/Report').then(m => ({ default: m.Report })));
+const Validation = lazy(() => import('./pages/Validation').then(m => ({ default: m.Validation })));
+const Approvals = lazy(() => import('./pages/Approvals').then(m => ({ default: m.Approvals })));
+const Scenarios = lazy(() => import('./pages/Scenarios').then(m => ({ default: m.Scenarios })));
+const Inventory = lazy(() => import('./pages/Inventory').then(m => ({ default: m.Inventory })));
+const Integrity = lazy(() => import('./pages/Integrity').then(m => ({ default: m.Integrity })));
+const Governance = lazy(() => import('./pages/Governance').then(m => ({ default: m.Governance })));
 import {
   fetchCampaigns,
   fetchAttacks,
@@ -45,10 +46,11 @@ export const App: React.FC = () => {
       const latestCamp = campList[0] || null;
       setActiveCampaign(latestCamp);
 
-      const atkList = await fetchAttacks(latestCamp?.id);
+      const [atkList, m] = await Promise.all([
+        fetchAttacks(latestCamp?.id),
+        fetchMetricsSummary(latestCamp?.id)
+      ]);
       setAttacks(atkList);
-
-      const m = await fetchMetricsSummary(latestCamp?.id);
       setMetrics(m);
     } catch (e) {
       console.error('Failed to load initial data:', e);
@@ -116,58 +118,65 @@ export const App: React.FC = () => {
       )}
 
       {currentTab === 'home' ? (
-        <LandingPage
-          onEnterApp={(tab) => setCurrentTab(tab || 'dashboard')}
-          onLoadDemo={handleLoadDemo}
-          isLoadingDemo={isLoadingDemo}
-        />
+        <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center">Loading...</div>}>
+          <LandingPage
+            onEnterApp={(tab) => setCurrentTab(tab || 'dashboard')}
+            onLoadDemo={handleLoadDemo}
+            isLoadingDemo={isLoadingDemo}
+          />
+        </Suspense>
       ) : currentTab === 'signin' ? (
-        <SignIn
-          onSignInSuccess={(role) => {
-            handleRoleChange(role);
-            setCurrentTab('dashboard');
-          }}
-          onBackToHome={() => setCurrentTab('home')}
-        />
+        <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center">Loading...</div>}>
+          <SignIn
+            onSignInSuccess={(role) => {
+              handleRoleChange(role);
+              setCurrentTab('dashboard');
+            }}
+            onBackToHome={() => setCurrentTab('home')}
+          />
+        </Suspense>
       ) : (
         <main className="flex-1 max-w-[1500px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {currentTab === 'dashboard' && (
-            <Dashboard
-              metrics={metrics}
-              attacks={attacks}
-              campaign={activeCampaign}
-              activeRole={activeRole}
-              onNavigate={(page) => setCurrentTab(page)}
-              onNavigateToIntegrity={handleNavigateToIntegrity}
-              onLoadDemo={handleLoadDemo}
-            />
-          )}
-          {currentTab === 'scenarios' && <Scenarios />}
-          {currentTab === 'integrity' && <Integrity initialRunId={integrityRunId} />}
-          {currentTab === 'governance' && <Governance />}
-          {currentTab === 'runner' && (
-            <CampaignRunner
-              activeCampaign={activeCampaign}
-              onCampaignCreated={handleCampaignCreated}
-              onNavigateToIntegrity={handleNavigateToIntegrity}
-              onNavigate={(page) => setCurrentTab(page)}
-            />
-          )}
-          {currentTab === 'findings' && (
-            <Findings
-              attacks={attacks}
-              onNavigateToIntegrity={handleNavigateToIntegrity}
-            />
-          )}
-          {currentTab === 'defenses' && <Defenses campaignId={activeCampaign?.id || null} />}
-          {currentTab === 'validation' && <Validation />}
-          {currentTab === 'approvals' && <Approvals />}
-          {currentTab === 'report' && (
-            <Report
-              campaignId={activeCampaign?.id || null}
-              onNavigateToIntegrity={handleNavigateToIntegrity}
-            />
-          )}
+          <Suspense fallback={<div className="h-full w-full flex items-center justify-center p-12">Loading component...</div>}>
+            {currentTab === 'dashboard' && (
+              <Dashboard
+                metrics={metrics}
+                attacks={attacks}
+                campaign={activeCampaign}
+                activeRole={activeRole}
+                onNavigate={(page) => setCurrentTab(page)}
+                onNavigateToIntegrity={handleNavigateToIntegrity}
+                onLoadDemo={handleLoadDemo}
+              />
+            )}
+            {currentTab === 'scenarios' && <Scenarios />}
+            {currentTab === 'inventory' && <Inventory />}
+            {currentTab === 'integrity' && <Integrity initialRunId={integrityRunId} />}
+            {currentTab === 'governance' && <Governance />}
+            {currentTab === 'runner' && (
+              <CampaignRunner
+                activeCampaign={activeCampaign}
+                onCampaignCreated={handleCampaignCreated}
+                onNavigateToIntegrity={handleNavigateToIntegrity}
+                onNavigate={(page) => setCurrentTab(page)}
+              />
+            )}
+            {currentTab === 'findings' && (
+              <Findings
+                attacks={attacks}
+                onNavigateToIntegrity={handleNavigateToIntegrity}
+              />
+            )}
+            {currentTab === 'defenses' && <Defenses campaignId={activeCampaign?.id || null} />}
+            {currentTab === 'validation' && <Validation />}
+            {currentTab === 'approvals' && <Approvals />}
+            {currentTab === 'report' && (
+              <Report
+                campaignId={activeCampaign?.id || null}
+                onNavigateToIntegrity={handleNavigateToIntegrity}
+              />
+            )}
+          </Suspense>
         </main>
       )}
 
