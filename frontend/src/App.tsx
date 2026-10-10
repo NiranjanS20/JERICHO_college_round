@@ -9,7 +9,6 @@ import { Report } from './pages/Report';
 import { Validation } from './pages/Validation';
 import { Approvals } from './pages/Approvals';
 import { Scenarios } from './pages/Scenarios';
-import { Inventory } from './pages/Inventory';
 import { Integrity } from './pages/Integrity';
 import { Governance } from './pages/Governance';
 import {
@@ -61,15 +60,15 @@ export const App: React.FC = () => {
 
     // Permission checks for active tab:
     if (newRole === 'analyst') {
-      if (['inventory', 'integrity', 'governance', 'approvals'].includes(currentTab)) {
+      if (['integrity', 'governance', 'approvals'].includes(currentTab)) {
         setCurrentTab('dashboard');
       }
     } else if (newRole === 'owner') {
-      if (['runner', 'scenarios', 'integrity', 'defenses', 'validation', 'approvals'].includes(currentTab)) {
+      if (['runner', 'scenarios', 'integrity', 'defenses', 'approvals'].includes(currentTab)) {
         setCurrentTab('dashboard');
       }
     } else if (newRole === 'auditor') {
-      if (['runner', 'scenarios', 'inventory', 'defenses', 'validation', 'approvals'].includes(currentTab)) {
+      if (['runner', 'scenarios', 'defenses', 'approvals'].includes(currentTab)) {
         setCurrentTab('integrity');
       }
     }
@@ -135,7 +134,6 @@ export const App: React.FC = () => {
             />
           )}
           {currentTab === 'scenarios' && <Scenarios />}
-          {currentTab === 'inventory' && <Inventory />}
           {currentTab === 'integrity' && <Integrity initialRunId={integrityRunId} />}
           {currentTab === 'governance' && <Governance />}
           {currentTab === 'runner' && (

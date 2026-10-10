@@ -195,6 +195,13 @@ export async function createValidationExperiment(payload: any) {
   return res.json();
 }
 
+export async function deleteValidationExperiment(expId: string) {
+  const res = await apiFetch(`${API_BASE}/validation/experiments/${encodeURIComponent(expId)}`, {
+    method: 'DELETE',
+  });
+  return res.json();
+}
+
 export async function fetchPendingApprovals() {
   const res = await apiFetch(`${API_BASE}/approvals/pending`);
   return res.json();

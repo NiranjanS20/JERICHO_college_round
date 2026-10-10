@@ -57,10 +57,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </span>
           </div>
           <button 
-            onClick={() => onNavigate('inventory')}
+            onClick={() => onNavigate('governance')}
             className="px-2.5 py-1 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
           >
-            Inspect Inventory
+            Inspect Governance
           </button>
         </div>
       )}
