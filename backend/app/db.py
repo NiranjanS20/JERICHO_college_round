@@ -78,7 +78,15 @@ async def init_db() -> None:
 
     # Seed initial data
     try:
-        from app.db.seed import seed_database
-        await seed_database()
+        import importlib.util
+        from pathlib import Path
+        seed_path = Path(__file__).parent / "db" / "seed.py"
+        if seed_path.exists():
+            spec = importlib.util.spec_from_file_location("app_db_seed", seed_path)
+            if spec and spec.loader:
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                await mod.seed_database()
     except Exception as e:
         print(f"Database seed notice: {e}")
+
