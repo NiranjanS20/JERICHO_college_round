@@ -709,15 +709,15 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
                       <div className="space-y-2 text-[11px]">
                         <div className="flex justify-between">
                           <span className="text-[#586D85]">Target:</span>
-                          <span className="font-mono font-bold text-[#132E4F]">{cs.target_model}</span>
+                          <span className="font-mono font-bold text-[#132E4F]">{cs.target_profile}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-[#586D85]">Role:</span>
-                          <span className="font-mono font-bold text-[#132E4F]">{cs.caller_role}</span>
+                          <span className="font-mono font-bold text-[#132E4F]">{cs.default_caller_role}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-[#586D85]">Fixture:</span>
-                          <span className="font-mono font-bold text-[#132E4F]">{cs.fixture_profile_id}</span>
+                          <span className="font-mono font-bold text-[#132E4F]">{cs.scenario_ids ? cs.scenario_ids[0] : 'default'}</span>
                         </div>
                       </div>
                     </div>
