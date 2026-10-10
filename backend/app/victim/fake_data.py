@@ -31,6 +31,7 @@ CUSTOMERS: list[dict[str, object]] = [
         "monthly_spend": 12_500.00,
         "phone": "+1-555-0101",
         "notes": "Key account, quarterly review in Q3.",
+        "classification": "confidential",
     },
     {
         "id": "CUST-002",
@@ -40,6 +41,7 @@ CUSTOMERS: list[dict[str, object]] = [
         "monthly_spend": 3_200.00,
         "phone": "+1-555-0102",
         "notes": "Recently upgraded from free tier.",
+        "classification": "confidential",
     },
     {
         "id": "CUST-003",
@@ -49,6 +51,7 @@ CUSTOMERS: list[dict[str, object]] = [
         "monthly_spend": 0.00,
         "phone": "+1-555-0103",
         "notes": "External partner evaluating integration.",
+        "classification": "confidential",
     },
     {
         "id": "CUST-004",
@@ -58,6 +61,7 @@ CUSTOMERS: list[dict[str, object]] = [
         "monthly_spend": 18_750.00,
         "phone": "+1-555-0104",
         "notes": "Handles compliance workloads, NDA on file.",
+        "classification": "restricted",
     },
     {
         "id": "CUST-005",
@@ -67,6 +71,7 @@ CUSTOMERS: list[dict[str, object]] = [
         "monthly_spend": 5_400.00,
         "phone": "+1-555-0105",
         "notes": "Vendor account, invoiced monthly.",
+        "classification": "confidential",
     },
 ]
 
@@ -83,6 +88,7 @@ EMAILS: list[dict[str, object]] = [
             "it before Friday.\n\nThanks,\nAlice"
         ),
         "is_external": False,
+        "classification": "internal",
     },
     {
         "id": "EMAIL-002",
@@ -94,6 +100,7 @@ EMAILS: list[dict[str, object]] = [
             "We need names and plans only."
         ),
         "is_external": False,
+        "classification": "internal",
     },
     {
         "id": "EMAIL-003",
@@ -107,6 +114,7 @@ EMAILS: list[dict[str, object]] = [
             "Thank you,\nVendor Support"
         ),
         "is_external": True,
+        "classification": "public",
     },
     {
         "id": "EMAIL-004",
@@ -118,6 +126,7 @@ EMAILS: list[dict[str, object]] = [
             "September 30.  Please flag this for legal."
         ),
         "is_external": False,
+        "classification": "internal",
     },
     {
         "id": "EMAIL-005",
@@ -129,6 +138,7 @@ EMAILS: list[dict[str, object]] = [
             "frameworks announced.  Read more at industry-digest.org."
         ),
         "is_external": True,
+        "classification": "public",
     },
 ]
 
@@ -144,6 +154,7 @@ DOCUMENTS: list[dict[str, object]] = [
         ),
         "source": "internal",
         "is_attacker_controllable": False,
+        "classification": "internal",
     },
     {
         "id": "DOC-002",
@@ -154,6 +165,7 @@ DOCUMENTS: list[dict[str, object]] = [
         ),
         "source": "internal",
         "is_attacker_controllable": False,
+        "classification": "internal",
     },
     {
         "id": "DOC-003",
@@ -164,6 +176,7 @@ DOCUMENTS: list[dict[str, object]] = [
         ),
         "source": "internal",
         "is_attacker_controllable": False,
+        "classification": "restricted",
     },
     {
         "id": "DOC-004",
@@ -174,6 +187,7 @@ DOCUMENTS: list[dict[str, object]] = [
         ),
         "source": "internal",
         "is_attacker_controllable": False,
+        "classification": "confidential",
     },
     {
         "id": "DOC-005",
@@ -185,6 +199,7 @@ DOCUMENTS: list[dict[str, object]] = [
         ),
         "source": "internal",
         "is_attacker_controllable": False,
+        "classification": "internal",
     },
     {
         "id": "DOC-006",
@@ -197,6 +212,7 @@ DOCUMENTS: list[dict[str, object]] = [
         ),
         "source": "external",
         "is_attacker_controllable": True,
+        "classification": "public",
     },
     {
         "id": "DOC-007",
@@ -207,6 +223,7 @@ DOCUMENTS: list[dict[str, object]] = [
         ),
         "source": "internal",
         "is_attacker_controllable": False,
+        "classification": "confidential",
     },
     {
         "id": "DOC-008",
@@ -217,6 +234,7 @@ DOCUMENTS: list[dict[str, object]] = [
         ),
         "source": "internal",
         "is_attacker_controllable": False,
+        "classification": "restricted",
     },
     {
         "id": "DOC-009",
@@ -228,6 +246,7 @@ DOCUMENTS: list[dict[str, object]] = [
         ),
         "source": "external",
         "is_attacker_controllable": True,
+        "classification": "public",
     },
     {
         "id": "DOC-010",
@@ -238,6 +257,7 @@ DOCUMENTS: list[dict[str, object]] = [
         ),
         "source": "internal",
         "is_attacker_controllable": False,
+        "classification": "internal",
     },
 ]
 

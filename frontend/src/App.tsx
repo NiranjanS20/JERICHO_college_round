@@ -8,6 +8,10 @@ import { Defenses } from './pages/Defenses';
 import { Report } from './pages/Report';
 import { Validation } from './pages/Validation';
 import { Approvals } from './pages/Approvals';
+import { Scenarios } from './pages/Scenarios';
+import { Inventory } from './pages/Inventory';
+import { Integrity } from './pages/Integrity';
+import { Governance } from './pages/Governance';
 import {
   fetchCampaigns,
   fetchAttacks,
@@ -93,6 +97,10 @@ export const App: React.FC = () => {
               onLoadDemo={handleLoadDemo}
             />
           )}
+          {currentTab === 'scenarios' && <Scenarios />}
+          {currentTab === 'inventory' && <Inventory />}
+          {currentTab === 'integrity' && <Integrity />}
+          {currentTab === 'governance' && <Governance />}
           {currentTab === 'runner' && (
             <CampaignRunner
               activeCampaign={activeCampaign}

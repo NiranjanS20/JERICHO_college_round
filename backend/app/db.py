@@ -1,7 +1,7 @@
 """
 Async database engine, session factory, and FastAPI dependency.
 
-Uses SQLAlchemy 2.0 async API with aiosqlite for local SQLite storage.
+Supports both Supabase PostgreSQL (via asyncpg) and local SQLite (via aiosqlite).
 All table DDL is driven from the ORM models that inherit from ``Base``.
 """
 
@@ -27,11 +27,25 @@ class Base(DeclarativeBase):
 # ── Engine & session factory ────────────────────────────────────
 _settings = get_settings()
 
+db_url = _settings.database_url
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+asyncpg://"):
+    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+is_sqlite = db_url.startswith("sqlite")
+
+connect_args = {}
+if is_sqlite:
+    connect_args["check_same_thread"] = False
+else:
+    # Transaction poolers require statement_cache_size=0 for asyncpg
+    connect_args["statement_cache_size"] = 0
+
 engine = create_async_engine(
-    _settings.database_url,
+    db_url,
     echo=False,
-    # aiosqlite needs check_same_thread disabled
-    connect_args={"check_same_thread": False},
+    connect_args=connect_args,
 )
 
 async_session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
@@ -55,9 +69,16 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 # ── Table initialisation ───────────────────────────────────────
 async def init_db() -> None:
-    """Create all tables that don't yet exist.
+    """Create all tables that don't yet exist and run initial seeder.
 
     Call once at application startup (e.g. in a ``lifespan`` handler).
     """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Seed initial data
+    try:
+        from app.db.seed import seed_database
+        await seed_database()
+    except Exception as e:
+        print(f"Database seed notice: {e}")

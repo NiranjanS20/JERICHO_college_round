@@ -2,8 +2,8 @@
 Trace recorder — captures every step of an agent run.
 
 Each step is a timestamped event (message, tool call, or verdict).
-The recorder can build a React Flow–compatible attack graph for
-visualising the attack chain in the frontend.
+Implements Domain 10 Hash Chaining over prev_hash and canonical JSON payloads,
+persisting Events, TraceSteps, and RunSeals to the database.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.oracle.oracle import OracleVerdict
+from app.traces.hash_chain import compute_event_hash, generate_run_seal
 
 
 # ---------------------------------------------------------------------------
@@ -34,6 +35,9 @@ class TraceStep:
     tool_result: Any = None
     is_malicious: bool = False
     verdict: dict[str, Any] | None = None  # for verdict step
+    canary_id: str | None = None  # for leak events
+    channel: str | None = None    # for leak events
+    snippet: str | None = None    # for leak events
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serialisable dictionary."""
@@ -91,7 +95,7 @@ class GraphEdge:
 # ---------------------------------------------------------------------------
 
 class TraceRecorder:
-    """Captures every step of a single agent run.
+    """Captures every step of a single agent run with hash-chain integrity.
 
     Parameters
     ----------
@@ -99,10 +103,15 @@ class TraceRecorder:
         Unique identifier for the attack run this trace belongs to.
     """
 
-    def __init__(self, attack_id: str) -> None:
+    def __init__(self, attack_id: str, run_id: str | None = None, scenario_id: str | None = None, config_version: str | None = None, policy_version: str | None = None) -> None:
         self.attack_id = attack_id
+        self.run_id = run_id or attack_id
+        self.scenario_id = scenario_id
+        self.config_version = config_version
+        self.policy_version = policy_version
         self._steps: list[TraceStep] = []
         self._verdict: OracleVerdict | None = None
+        self._head_hash: str = "0" * 64
 
     # ── recording API ─────────────────────────────────────────────
 
@@ -156,6 +165,20 @@ class TraceRecorder:
             )
         )
 
+    def record_leak(self, canary_id: str, channel: str, snippet: str, step_index: int) -> None:
+        """Record a data exfiltration event."""
+        self._steps.append(
+            TraceStep(
+                step_index=step_index,
+                timestamp=_now_iso(),
+                kind="leak_detected",
+                canary_id=canary_id,
+                channel=channel,
+                snippet=snippet,
+                is_malicious=True
+            )
+        )
+
     # ── query API ─────────────────────────────────────────────────
 
     def get_trace_steps(self) -> list[dict[str, Any]]:
@@ -165,38 +188,47 @@ class TraceRecorder:
     # ── attack graph ──────────────────────────────────────────────
 
     def build_attack_graph(self) -> dict[str, Any]:
-        """Build a React Flow–compatible graph from recorded steps.
-
-        Returns
-        -------
-        dict
-            ``{"nodes": [...], "edges": [...]}`` ready for the frontend.
-        """
+        """Build a React Flow–compatible graph from recorded steps."""
         nodes: list[GraphNode] = []
         edges: list[GraphEdge] = []
-
         malicious_node_ids: set[str] = set()
 
         for step in self._steps:
             if step.kind == "verdict":
-                continue  # verdict is metadata, not a graph node
+                continue
 
             node_id = f"step-{step.step_index}"
             node_type = _classify_node(step)
             label = _node_label(step)
 
+            node_data = {
+                "step_index": step.step_index,
+                "kind": step.kind,
+            }
+            if step.content is not None:
+                node_data["content"] = step.content
+            if step.tool_name is not None:
+                node_data["tool_name"] = step.tool_name
+            if step.tool_args is not None:
+                node_data["tool_args"] = step.tool_args
+            if step.tool_result is not None:
+                node_data["tool_result"] = step.tool_result
+            if step.snippet is not None:
+                node_data["snippet"] = step.snippet
+            if step.canary_id is not None:
+                node_data["canary_id"] = step.canary_id
+
             node = GraphNode(
                 id=node_id,
                 type=node_type,
                 label=label,
-                data={"step_index": step.step_index, "kind": step.kind},
+                data=node_data,
             )
             nodes.append(node)
 
             if node_type == "leak" or step.is_malicious:
                 malicious_node_ids.add(node_id)
 
-        # Edges: connect sequential non-verdict steps
         non_verdict = [n for n in nodes]
         for i in range(1, len(non_verdict)):
             src = non_verdict[i - 1]
@@ -216,29 +248,68 @@ class TraceRecorder:
             "edges": [e.to_dict() for e in edges],
         }
 
-    # ── persistence ───────────────────────────────────────────────
+    # ── persistence & hash chain ───────────────────────────────────
 
     async def save_to_db(self, session: Any) -> None:
-        """Persist every :class:`TraceStep` to the database.
+        """Persist every TraceStep and Event with SHA256 hash chaining."""
+        from app.models import TraceStep as TraceStepRow, Event, RunSeal, Run
+        from app.config import get_settings
 
-        Parameters
-        ----------
-        session:
-            An ``AsyncSession`` (SQLAlchemy). The import of the ORM model
-            is deferred so this module doesn't force a hard dependency on
-            the DB layer at import time.
-        """
-        # Lazy import to avoid circular / missing-module errors at import time
-        from app.models import TraceStepRow  # type: ignore[import-untyped]
+        # Check or create Run record
+        run_obj = await session.get(Run, self.run_id)
+        if not run_obj:
+            run_obj = Run(id=self.run_id, attack_id=self.attack_id)
+            session.add(run_obj)
+            await session.flush()
 
-        for step in self._steps:
-            row = TraceStepRow(
+        prev_hash = "0" * 64
+
+        for seq, step in enumerate(self._steps):
+            payload = step.to_dict()
+            curr_hash = compute_event_hash(prev_hash, payload)
+
+            # Insert append-only Event
+            event_row = Event(
+                run_id=self.run_id,
+                seq=seq,
+                event_type=step.kind,
+                actor="victim" if step.role != "user" else "attacker",
+                payload=payload,
+                prev_hash=prev_hash,
+                hash=curr_hash,
+            )
+            session.add(event_row)
+
+            # Insert legacy TraceStep for backwards compatibility
+            step_row = TraceStepRow(
                 attack_id=self.attack_id,
                 step_index=step.step_index,
-                kind=step.kind,
-                data=json.dumps(step.to_dict()),
+                role=step.role or "system",
+                content=step.content or json.dumps(payload),
+                tool_name=step.tool_name,
+                tool_args=step.tool_args,
+                tool_result=step.tool_result if isinstance(step.tool_result, (dict, list)) else {"raw": str(step.tool_result)},
+                is_malicious=step.is_malicious,
             )
-            session.add(row)
+            session.add(step_row)
+
+            prev_hash = curr_hash
+
+        self._head_hash = prev_hash
+        run_obj.head_hash = self._head_hash
+        run_obj.tool_call_count = len([s for s in self._steps if s.kind == "tool_call"])
+
+        # Create RunSeal
+        seal_secret = get_settings().trace_seal_key
+        seal_hmac = generate_run_seal(self.run_id, self._head_hash, len(self._steps), seal_secret)
+
+        seal_row = RunSeal(
+            run_id=self.run_id,
+            head_hash=self._head_hash,
+            event_count=len(self._steps),
+            seal_hmac=seal_hmac,
+        )
+        session.add(seal_row)
         await session.flush()
 
     # ── serialisation ─────────────────────────────────────────────
@@ -247,7 +318,12 @@ class TraceRecorder:
         """Serialise the full trace (steps + verdict) as a JSON string."""
         payload: dict[str, Any] = {
             "attack_id": self.attack_id,
+            "run_id": self.run_id,
+            "scenario_id": self.scenario_id,
+            "config_version": self.config_version,
+            "policy_version": self.policy_version,
             "steps": self.get_trace_steps(),
+            "head_hash": self._head_hash,
         }
         if self._verdict is not None:
             payload["verdict"] = asdict(self._verdict)
@@ -255,15 +331,15 @@ class TraceRecorder:
 
     @classmethod
     def from_json(cls, data: str) -> TraceRecorder:
-        """Deserialise a JSON string into a :class:`TraceRecorder`.
-
-        Parameters
-        ----------
-        data:
-            JSON string previously produced by :meth:`to_json`.
-        """
+        """Deserialise a JSON string into a TraceRecorder."""
         payload = json.loads(data)
-        recorder = cls(attack_id=payload["attack_id"])
+        recorder = cls(
+            attack_id=payload["attack_id"], 
+            run_id=payload.get("run_id"),
+            scenario_id=payload.get("scenario_id"),
+            config_version=payload.get("config_version"),
+            policy_version=payload.get("policy_version")
+        )
 
         for raw_step in payload.get("steps", []):
             step = TraceStep(
@@ -277,6 +353,9 @@ class TraceRecorder:
                 tool_result=raw_step.get("tool_result"),
                 is_malicious=raw_step.get("is_malicious", False),
                 verdict=raw_step.get("verdict"),
+                canary_id=raw_step.get("canary_id"),
+                channel=raw_step.get("channel"),
+                snippet=raw_step.get("snippet"),
             )
             recorder._steps.append(step)
 
@@ -298,17 +377,19 @@ def _now_iso() -> str:
 
 def _classify_node(step: TraceStep) -> str:
     """Map a trace step to a React Flow node type."""
+    if step.kind == "leak_detected":
+        return "leak"
+
     if step.is_malicious:
         return "leak"
 
     if step.kind == "message":
         if step.role == "user":
             return "user_input"
-        return "llm_decision"  # assistant or system
+        return "llm_decision"
 
     if step.kind == "tool_call":
         tool = step.tool_name or ""
-        # Detect canary in the tool result to mark as leak
         from app.victim.fake_data import CANARY_STRINGS, CANARY_SECRETS
 
         result_lower = str(step.tool_result).lower()
@@ -320,7 +401,7 @@ def _classify_node(step: TraceStep) -> str:
             return "retrieved_doc"
         return "tool_call"
 
-    return "tool_call"  # fallback
+    return "tool_call"
 
 
 def _node_label(step: TraceStep) -> str:

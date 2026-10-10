@@ -10,6 +10,7 @@ import asyncio
 from app.defenses import DefensePipeline
 from app.victim.tools import TOOL_REGISTRY
 from app.victim.taint import TaintTracker
+from app.security.leak_scanner import LeakScanner
 
 class Gateway:
     """Central point for tool execution and policy enforcement."""
@@ -18,6 +19,7 @@ class Gateway:
         self.defenses = defenses
         self.taint_tracker = taint_tracker or TaintTracker()
         self.recorded_events: list[dict[str, Any]] = []
+        self.leak_scanner = LeakScanner()
         
     async def execute(self, tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Validate, enforce policy, and execute a tool."""
@@ -68,6 +70,38 @@ class Gateway:
                 "tool_name": tool_name,
                 "result": result
             })
+            
+            # Apply taint tracking based on returned data classification
+            from app.victim.taint import Taint
+            def _track_taint(item: Any) -> None:
+                if isinstance(item, dict) and "classification" in item:
+                    domain = None
+                    if item.get("is_external"):
+                        domain = item.get("from_addr", "").split("@")[-1] if "from_addr" in item else "external"
+                    
+                    self.taint_tracker.add(Taint(
+                        origin="untrusted_retrieval" if item.get("classification") == "public" else "trusted",
+                        source_id=item.get("id"),
+                        domain=domain
+                    ))
+            
+            if isinstance(result, dict):
+                _track_taint(result)
+            elif isinstance(result, list):
+                for item in result:
+                    _track_taint(item)
+            
+            leak_report = self.leak_scanner.scan_data(result, channel=tool_name)
+            if leak_report.leaked:
+                self.recorded_events.append({
+                    "type": "leak_detected",
+                    "canary_id": leak_report.canary_id,
+                    "channel": leak_report.channel,
+                    "snippet": leak_report.snippet
+                })
+                # Redact or allow depending on mode, but for now we just record it.
+                # Could replace result with {"error": "Data Exfiltration Blocked"} if policy dictates.
+            
             return result
         except Exception as e:
             return {"error": f"Execution failed: {str(e)}"}

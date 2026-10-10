@@ -49,6 +49,8 @@ class AgentResult:
     messages: list[dict[str, Any]]
     tool_calls: list[ToolCallLog]
     steps: int
+    config_version: str | None = None
+    policy_version: str | None = None
     error: str | None = None
 
 
@@ -73,6 +75,9 @@ class VictimAgent:
         self._budget = get_budget()
         self._client = GeminiClient.get_instance()
         self._tool_declarations = get_tool_declarations()
+        
+        from app.security.config_integrity import create_config_snapshot
+        self._config_snapshot = create_config_snapshot([d.__class__.__name__ for d in self._pipeline.defenses] if self._pipeline and self._pipeline.defenses else None)
 
     # ── Public API ──────────────────────────────────────────────
 
@@ -162,6 +167,8 @@ class VictimAgent:
             messages=_messages_to_dicts(messages),
             tool_calls=list(get_call_log()),
             steps=step if "step" in dir() else 0,  # type: ignore[possibly-undefined]
+            config_version=self._config_snapshot.config_version,
+            policy_version=self._config_snapshot.policy_version,
             error=error,
         )
 
@@ -347,6 +354,8 @@ class VictimAgent:
             ],
             tool_calls=list(get_call_log()),
             steps=1,
+            config_version=self._config_snapshot.config_version,
+            policy_version=self._config_snapshot.policy_version,
         )
 
 

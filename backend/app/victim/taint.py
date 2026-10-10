@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 class Taint:
     """Taint label for a piece of data."""
     origin: str  # "user", "trusted", "untrusted_retrieval", "memory"
+    source_id: str | None = None
+    domain: str | None = None
     
 @dataclass
 class TaintTracker:

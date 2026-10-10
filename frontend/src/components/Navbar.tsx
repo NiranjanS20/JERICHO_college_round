@@ -9,7 +9,11 @@ import {
   ArrowRight,
   Shield,
   Beaker,
-  UserCheck
+  UserCheck,
+  ListTree,
+  Archive,
+  Users,
+  ShieldCheck
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -28,6 +32,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   const tabs = [
     { id: 'home', label: 'Front Page', icon: Sparkles },
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+    { id: 'scenarios', label: 'Scenarios', icon: ListTree },
+    { id: 'inventory', label: 'Inventory', icon: Archive },
+    { id: 'integrity', label: 'Integrity', icon: ShieldCheck },
+    { id: 'governance', label: 'Governance', icon: Users },
     { id: 'runner', label: 'Campaign Runner', icon: Crosshair },
     { id: 'findings', label: 'Findings', icon: ShieldAlert },
     { id: 'defenses', label: 'Defenses', icon: CheckCircle2 },
