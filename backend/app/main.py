@@ -14,6 +14,10 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.security.headers import SecurityHeadersMiddleware
+from app.security.rate_limit import setup_rate_limiting
+from app.security.redaction import setup_log_redaction
+
 from app.config import get_settings
 from app.db import init_db
 from app.api.campaigns import router as campaigns_router
@@ -25,6 +29,10 @@ from app.api.metrics import router as metrics_router
 from app.api.reports import router as reports_router
 from app.api.demo import router as demo_router
 from app.api.stream import router as stream_router
+from app.api.users import router as users_router
+from app.api.findings import router as findings_router
+from app.api.validation import router as validation_router
+from app.api.approvals import router as approvals_router
 
 
 @asynccontextmanager
@@ -44,6 +52,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+setup_log_redaction()
+setup_rate_limiting(app)
+
 # ── CORS Middleware ─────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
@@ -52,6 +63,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SecurityHeadersMiddleware)
 
 # ── Register API Routers ────────────────────────────────────────
 app.include_router(campaigns_router)
@@ -63,6 +75,10 @@ app.include_router(metrics_router)
 app.include_router(reports_router)
 app.include_router(demo_router)
 app.include_router(stream_router)
+app.include_router(users_router)
+app.include_router(findings_router)
+app.include_router(validation_router)
+app.include_router(approvals_router)
 
 
 @app.get("/api/health")

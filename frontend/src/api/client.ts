@@ -122,3 +122,36 @@ export async function fetchReport(campaignId: string, format: 'json' | 'html' = 
   return res.json();
 }
 
+export async function fetchValidationExperiments() {
+  const res = await fetch(`${API_BASE}/validation/experiments`);
+  return res.json();
+}
+
+export async function createValidationExperiment(payload: any) {
+  const res = await fetch(`${API_BASE}/validation/experiments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}
+
+export async function fetchPendingApprovals() {
+  const res = await fetch(`${API_BASE}/approvals/pending`);
+  return res.json();
+}
+
+export async function approveAction(approvalId: string) {
+  const res = await fetch(`${API_BASE}/approvals/${approvalId}/approve`, {
+    method: 'POST',
+  });
+  return res.json();
+}
+
+export async function rejectAction(approvalId: string) {
+  const res = await fetch(`${API_BASE}/approvals/${approvalId}/reject`, {
+    method: 'POST',
+  });
+  return res.json();
+}
+

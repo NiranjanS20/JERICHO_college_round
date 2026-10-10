@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 import logging
+import uuid
 from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -134,3 +135,26 @@ async def upsert_finding_from_attack(
 
     await session.commit()
     return finding
+
+
+class FindingsService:
+    def __init__(self) -> None:
+        self.findings: list[dict[str, Any]] = []
+        
+    def record_finding(self, campaign_id: str, attack_id: str, severity: str, details: dict[str, Any]) -> str:
+        finding_id = str(uuid.uuid4())
+        self.findings.append({
+            "id": finding_id,
+            "campaign_id": campaign_id,
+            "attack_id": attack_id,
+            "severity": severity,
+            "details": details
+        })
+        return finding_id
+        
+    def get_findings_for_campaign(self, campaign_id: str) -> list[dict[str, Any]]:
+        return [f for f in self.findings if f["campaign_id"] == campaign_id]
+
+
+findings_service = FindingsService()
+

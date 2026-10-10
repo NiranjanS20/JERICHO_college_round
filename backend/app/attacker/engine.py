@@ -17,8 +17,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from google import genai
 from google.genai import types
+from app.llm.gemini import GeminiClient
 
 from app.attacker.mutators import mutate_payload
 from app.attacker.scoring import calculate_progress_score, format_attacker_feedback, rank_attempts
@@ -98,15 +98,7 @@ class AdaptiveAttackEngine:
         self._budget_k = budget_k or self._settings.attack_budget_k
         self._oracle = Oracle()
 
-        # Initialize Gemini client if API key is present
-        self._has_api_key = bool(
-            self._settings.gemini_api_key
-            and self._settings.gemini_api_key != "your-api-key-here"
-        )
-        if self._has_api_key:
-            self._client = genai.Client(api_key=self._settings.gemini_api_key)
-        else:
-            self._client = None
+        self._client = GeminiClient.get_instance()
 
     async def execute_goal(
         self,
@@ -253,8 +245,8 @@ class AdaptiveAttackEngine:
         best_attempt: AdaptiveIteration | None,
     ) -> tuple[str, str, str, str]:
         """Generate the next attack payload using Gemini or fallback mutators."""
-        # If no API key or offline mode, run deterministic seed + mutator progression
-        if not self._has_api_key or self._client is None:
+        # If offline mode, run deterministic seed + mutator progression
+        if self._client.client is None:
             return self._fallback_mutation(goal, current_strategy, iteration, best_attempt)
 
         # Build prompt for Attacker LLM
@@ -271,8 +263,7 @@ Output valid JSON only.
 """
 
         try:
-            self._budget.consume(1)
-            response = await self._client.aio.models.generate_content(
+            response = await self._client.generate_content(
                 model=self._model,
                 contents=[
                     types.Content(role="user", parts=[types.Part.from_text(text=user_prompt)]),
@@ -283,6 +274,8 @@ Output valid JSON only.
                     response_mime_type="application/json",
                 ),
             )
+            if response is None:
+                raise RuntimeError("LLM offline")
             raw_text = response.text or ""
             data = json.loads(raw_text)
 
