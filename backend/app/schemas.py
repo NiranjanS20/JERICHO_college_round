@@ -152,6 +152,11 @@ class CampaignResponse(StrictBaseModel):
     defense_ids: list[str]
     config_snapshot: dict[str, Any]
     provenance: str = "sample"
+    execution_mode: str = "offline"
+    attempts_used: int = 0
+    llm_calls_used: int = 0
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
 
 
 
@@ -212,6 +217,8 @@ class AttackResponse(StrictBaseModel):
     oracle_verdict: OracleVerdict | None = None
     partial_score: float
     best_in_chain: bool
+    execution_mode: str = "offline"
+    config_hash: str | None = None
     created_at: datetime
     trace_steps: list[TraceStepResponse] = Field(default_factory=list)
 
@@ -299,6 +306,11 @@ class MetricsSummaryResponse(StrictBaseModel):
     failed_attacks: int = 0
     error_attacks: int = 0
     overall_asr: float = 0.0
+    block_rate: float = 0.0
+    leak_rate: float = 0.0
+    unauthorized_action_rate: float = 0.0
+    execution_failure_rate: float = 0.0
+    benign_utility_rate: float = 1.0
     avg_partial_score: float = 0.0
     category_breakdown: dict[str, dict[str, Any]] = Field(default_factory=dict)
     strategy_breakdown: dict[str, dict[str, Any]] = Field(default_factory=dict)

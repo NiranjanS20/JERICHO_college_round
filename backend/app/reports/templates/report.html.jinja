@@ -146,5 +146,14 @@
       </tbody>
     </table>
   </div>
+
+  <div class="section" style="background: #FFFFFF; border: 1px solid #F2F0EA; border-radius: 8px; padding: 20px;">
+    <h3>4. Cryptographic Trace Integrity &amp; Limitations Notice</h3>
+    <p style="font-size: 13px; line-height: 1.6; color: #1C1C1A; opacity: 0.85;">
+      Each execution trace event is anchored into a linear SHA-256 hash chain and sealed with an HMAC-SHA256 run signature.
+      <strong>Scope of Proof:</strong> The hash chain and HMAC seal mathematically detect post-hoc modifications, insertions, deletions, or reordering of stored trace events relative to the initial run checkpoint.
+      <strong>Limitations:</strong> This mechanism proves historical record integrity, but does not independently verify whether the LLM's raw generation was truthful or that the environment's synthetic data reflected production conditions.
+    </p>
+  </div>
 </body>
 </html>

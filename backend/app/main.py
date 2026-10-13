@@ -113,6 +113,14 @@ async def health_check() -> dict[str, str]:
     }
 
 
+@app.get("/api/health/llm")
+async def llm_health_check(check: bool = False) -> dict[str, Any]:
+    """Safe LLM connectivity check that never returns API keys."""
+    from app.llm.gemini import GeminiClient
+    client = GeminiClient.get_instance()
+    return await client.get_health_status(test_connectivity=check)
+
+
 # ── Frontend SPA & Landing page mount ────────────────────────────
 dist_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 landing_path = Path(__file__).resolve().parent.parent.parent / "landing.html"

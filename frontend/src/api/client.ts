@@ -66,6 +66,29 @@ export async function fetchHealth(): Promise<{ status: string; app: string }> {
   return res.json();
 }
 
+export interface LlmHealthStatus {
+  configured: boolean;
+  mode: 'live' | 'offline';
+  demo_mode: boolean;
+  models: {
+    victim: string;
+    attacker: string;
+    classifier: string;
+  };
+  call_counts: {
+    live: number;
+    offline: number;
+    failed: number;
+  };
+  connectivity: 'verified' | 'unverified' | 'offline' | 'error';
+  error: string | null;
+}
+
+export async function fetchLlmHealth(check: boolean = false): Promise<LlmHealthStatus> {
+  const res = await apiFetch(`${API_BASE}/health/llm?check=${check}`);
+  return res.json();
+}
+
 export async function loadDemoCampaign(): Promise<{
   status: string;
   campaign_id: string;
@@ -139,6 +162,35 @@ export async function createCampaign(payload: {
   if (!res.ok) {
     const errorBody = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(errorBody.detail || `Failed to create campaign: ${res.status}`);
+  }
+  return res.json();
+}
+
+export interface BenignRunResponse {
+  campaign_id: string;
+  case_study_id?: string;
+  total_tasks: number;
+  passed_tasks: number;
+  utility_rate: number;
+  results: Array<{
+    task_id: string;
+    task_name: string;
+    passed: boolean;
+    tools_called: string[];
+    missing_tools: string[];
+    missing_keywords: string[];
+    policy_violated: boolean;
+    details: string;
+  }>;
+}
+
+export async function runCampaignBenign(campaignId: string): Promise<BenignRunResponse> {
+  const res = await apiFetch(`${API_BASE}/campaigns/${encodeURIComponent(campaignId)}/benign`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(errorBody.detail || `Failed to run benign tasks: ${res.status}`);
   }
   return res.json();
 }

@@ -52,9 +52,10 @@ async def _stream_stored_campaign(campaign: Campaign) -> AsyncGenerator[str, Non
 @router.get("/{campaign_id}")
 async def stream_campaign_events(
     campaign_id: str,
+    last_seq: int = 0,
     db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
-    """Stream live or recorded red-team campaign events over Server-Sent Events."""
+    """Stream live or recorded red-team campaign events over Server-Sent Events with sequence replay."""
     # Check campaign existence
     stmt = (
         select(Campaign)
@@ -69,10 +70,10 @@ async def stream_campaign_events(
             detail=f"Campaign '{campaign_id}' not found.",
         )
 
-    # If the campaign is still running, attach to live pubsub
-    if campaign.status == "running":
+    # If the campaign is still running or has in-memory event bus history, use sequence-aware event generator
+    if campaign.status == "running" or len(event_bus.get_history(campaign_id)) > 0:
         return StreamingResponse(
-            event_bus.event_generator(campaign_id),
+            event_bus.event_generator(campaign_id, last_seq=last_seq),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -81,7 +82,7 @@ async def stream_campaign_events(
             },
         )
 
-    # Otherwise stream the stored events sequentially
+    # Otherwise stream the stored events sequentially from database
     return StreamingResponse(
         _stream_stored_campaign(campaign),
         media_type="text/event-stream",

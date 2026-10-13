@@ -39,6 +39,8 @@ export interface AttackSummary {
   created_at: string;
   injection_point?: string;
   payload?: string;
+  execution_mode?: 'live' | 'offline' | 'mixed' | string;
+  config_hash?: string;
 }
 
 export interface AttackDetail extends AttackSummary {
@@ -57,6 +59,11 @@ export interface Campaign {
   budget_per_goal: number;
   defense_ids: string[];
   config_snapshot: Record<string, any>;
+  execution_mode?: 'live' | 'offline' | 'mixed' | string;
+  started_at?: string | null;
+  ended_at?: string | null;
+  attempts_used?: number;
+  llm_calls_used?: number;
 }
 
 export interface ReplayResult {

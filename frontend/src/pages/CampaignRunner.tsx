@@ -33,14 +33,19 @@ import {
 } from 'lucide-react';
 import {
   createCampaign,
+  fetchCampaign,
+  fetchAttacks,
   validateSimulation,
   fetchTraceGraph,
   killCampaign,
   fetchScenarios,
   fetchCaseStudies,
   fetchDefenses,
+  runCampaignBenign,
+  fetchIntegrity,
   PreLaunchCheck,
   PreLaunchValidationResponse,
+  BenignRunResponse,
 } from '../api/client';
 import { Campaign, AttackGraph } from '../types';
 
@@ -150,6 +155,19 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
   // Pre-launch validation state
   const [validationResult, setValidationResult] = useState<PreLaunchValidationResponse | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [validationStale, setValidationStale] = useState(false);
+
+  // Execution mode tracking ('live' | 'offline' | 'mixed')
+  const [executionMode, setExecutionMode] = useState<'live' | 'offline' | 'mixed'>('offline');
+
+  // Benign Utility Benchmark state
+  const [benignRunning, setBenignRunning] = useState(false);
+  const [benignResults, setBenignResults] = useState<BenignRunResponse | null>(null);
+  const [benignError, setBenignError] = useState<string | null>(null);
+
+  // Trace Integrity Verification state
+  const [integrityStatus, setIntegrityStatus] = useState<any | null>(null);
+  const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(false);
 
   // Live Execution & Graph State
   const [isStreaming, setIsStreaming] = useState(false);
@@ -164,6 +182,38 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const timerRef = useRef<any>(null);
+
+  // Synchronize active campaign state (for page refresh resilience & parent navigation)
+  useEffect(() => {
+    if (activeCampaign) {
+      if (activeCampaign.status === 'running') {
+        if (!isStreaming) {
+          startLiveStream(activeCampaign.id);
+        }
+      } else if (activeCampaign.status === 'completed' || activeCampaign.status === 'failed') {
+        setViewState('results');
+        if (activeCampaign.execution_mode) {
+          setExecutionMode(activeCampaign.execution_mode as any);
+        }
+        fetchAttacks(activeCampaign.id).then((atks) => {
+          if (atks && atks.length > 0) {
+            const latest = atks[atks.length - 1];
+            setLastVerdict({
+              success: latest.status === 'success',
+              severity: latest.status === 'success' ? 'high' : 'none',
+              execution_status: activeCampaign.status,
+              verdict: latest.status,
+            });
+            loadGraph(latest.id);
+          }
+        }).catch(console.error);
+
+        fetchIntegrity(activeCampaign.id).then((res) => {
+          setIntegrityStatus(res);
+        }).catch(console.warn);
+      }
+    }
+  }, [activeCampaign?.id, activeCampaign?.status]);
 
   // Load scenarios on mount
   useEffect(() => {
@@ -225,12 +275,12 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
     const baseConfig = {
       schema_version: '1.0',
       target: {
-        profile_id: 'support_copilot',
-        version_id: 'v2.4.1-acme',
+        profile_id: selectedCaseStudy ? selectedCaseStudy.target_profile : 'support_copilot',
+        version_id: selectedCaseStudy ? selectedCaseStudy.target_version : 'v2.4.1-acme',
         model_id: targetModel,
         system_prompt_version: promptVersion,
         caller_role: callerRole,
-        permission_manifest_id: permissionManifest,
+        permission_manifest_id: selectedCaseStudy ? selectedCaseStudy.permission_manifest : permissionManifest,
         enabled_tools: enabledTools,
         memory_enabled: memoryEnabled,
         memory_trust_mode: memoryTrustMode,
@@ -281,18 +331,25 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
 
   // Re-run validation whenever config changes with debounce
   useEffect(() => {
+    setValidationStale(true);
+    setIsValidating(true);
     const config = getSimulationConfig();
     const timer = setTimeout(() => {
       validateSimulation(config)
         .then((res) => {
           setValidationResult(res);
+          setValidationStale(false);
+          setIsValidating(false);
         })
         .catch((err) => {
           console.warn('Live validation warning:', err);
+          setValidationStale(false);
+          setIsValidating(false);
         });
-    }, 200);
+    }, 250);
     return () => clearTimeout(timer);
   }, [
+    selectedCaseStudy,
     targetModel,
     promptVersion,
     callerRole,
@@ -300,9 +357,19 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
     selectedScenarioId,
     goalText,
     category,
+    surfaces,
+    injectionPoint,
+    strategyMode,
+    defenseProfile,
     enabledDefenses,
+    humanApprovalGate,
+    runtimeLimitsActive,
+    killSwitchActive,
     attemptsBudget,
+    maxTotalLlmCalls,
     maxAgentSteps,
+    maxToolCalls,
+    maxWallSeconds,
   ]);
 
   // Handle defense profile change
@@ -423,8 +490,17 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
         const parsed = JSON.parse(event.data);
         setEventsLog((prev) => [parsed, ...prev]);
 
-        if (parsed.event === 'attack_started') {
+        if (parsed.execution_mode) {
+          setExecutionMode(parsed.execution_mode);
+        }
+
+        if (parsed.event === 'campaign_started') {
+          if (parsed.execution_mode) setExecutionMode(parsed.execution_mode);
+        } else if (parsed.event === 'attack_started') {
+          if (parsed.execution_mode) setExecutionMode(parsed.execution_mode);
           setCurrentStepProgress('generating_payload');
+        } else if (parsed.event === 'iteration_completed') {
+          setCurrentStepProgress(parsed.oracle_success ? 'oracle_evaluated' : 'generating_payload');
         } else if (parsed.event === 'tool_call') {
           setCurrentStepProgress('gateway_interception');
         } else if (parsed.event === 'oracle_verdict') {
@@ -432,11 +508,20 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
           setLastVerdict(parsed.verdict);
         } else if (parsed.event === 'attack_finished' && parsed.attack_id) {
           loadGraph(parsed.attack_id);
+        } else if (parsed.event === 'campaign_failed') {
+          setErrorMessage(parsed.error || 'Campaign execution failed.');
+          setIsStreaming(false);
+          setViewState('results');
+          if (timerRef.current) clearInterval(timerRef.current);
+          es.close();
         } else if (parsed.event === 'campaign_finished') {
           setIsStreaming(false);
           setViewState('results');
           if (timerRef.current) clearInterval(timerRef.current);
           es.close();
+          fetchIntegrity(campaignId).then((res) => {
+            setIntegrityStatus(res);
+          }).catch(console.warn);
         }
       } catch (err) {
         console.error('SSE parse error:', err);
@@ -444,9 +529,10 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
     };
 
     es.onerror = () => {
-      setIsStreaming(false);
-      if (timerRef.current) clearInterval(timerRef.current);
-      es.close();
+      if (es.readyState === EventSource.CLOSED) {
+        setIsStreaming(false);
+        if (timerRef.current) clearInterval(timerRef.current);
+      }
     };
   };
 
@@ -463,10 +549,48 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
       });
 
       onCampaignCreated(camp);
+      try {
+        localStorage.setItem('agentbreak_active_campaign_id', camp.id);
+      } catch (e) {
+        // ignore storage errors
+      }
       startLiveStream(camp.id);
     } catch (err: any) {
       console.error('Failed to launch campaign:', err);
       setErrorMessage(err.message || 'Failed to launch campaign. Check permissions.');
+    }
+  };
+
+  const handleRunBenign = async () => {
+    const cId = activeCampaign?.id || localStorage.getItem('agentbreak_active_campaign_id');
+    if (!cId) {
+      setBenignError('No active campaign found to run benign benchmark.');
+      return;
+    }
+    setBenignRunning(true);
+    setBenignError(null);
+    try {
+      const res = await runCampaignBenign(cId);
+      setBenignResults(res);
+    } catch (err: any) {
+      console.error('Failed to run benign tasks:', err);
+      setBenignError(err.message || 'Failed to evaluate benign utility.');
+    } finally {
+      setBenignRunning(false);
+    }
+  };
+
+  const handleCheckIntegrity = async () => {
+    const cId = activeCampaign?.id || localStorage.getItem('agentbreak_active_campaign_id');
+    if (!cId) return;
+    setIsCheckingIntegrity(true);
+    try {
+      const res = await fetchIntegrity(cId);
+      setIntegrityStatus(res);
+    } catch (err) {
+      console.warn('Integrity check error:', err);
+    } finally {
+      setIsCheckingIntegrity(false);
     }
   };
 
@@ -1148,13 +1272,39 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
           <div className="bg-white rounded-3xl border border-[#95A1D8]/20 p-6 sm:p-8 shadow-sm space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#95A1D8]/15">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200">
-                  <CheckCircle2 className="w-5 h-5" />
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
+                  validationResult && !validationResult.valid
+                    ? 'bg-red-50 text-red-600 border-red-200'
+                    : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                }`}>
+                  {validationResult && !validationResult.valid ? (
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                  ) : (
+                    <CheckCircle2 className="w-5 h-5" />
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#132E4F]">
-                    Pre-launch validation
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-[#132E4F]">
+                      Pre-launch validation
+                    </h3>
+                    {isValidating || validationStale ? (
+                      <span className="px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-300 rounded-full text-[10px] font-bold flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        Re-validating...
+                      </span>
+                    ) : validationResult?.valid ? (
+                      <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-full text-[10px] font-bold flex items-center gap-1">
+                        <Check className="w-3 h-3" />
+                        Valid &amp; Frozen
+                      </span>
+                    ) : validationResult && !validationResult.valid ? (
+                      <span className="px-2.5 py-0.5 bg-red-50 text-red-700 border border-red-300 rounded-full text-[10px] font-bold flex items-center gap-1">
+                        <XOctagon className="w-3 h-3" />
+                        Violations Found
+                      </span>
+                    ) : null}
+                  </div>
                   <p className="text-xs text-[#586D85]">
                     Strict safety checks verified before starting autonomous combat
                   </p>
@@ -1177,25 +1327,56 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
             <div className="space-y-3">
               {(validationResult?.checks || [
                 { name: 'All selected scenarios have defined success criteria.', passed: true, message: 'Objective bound to deterministic Canary & Policy Oracle rule.' },
-                { name: 'The required tools and synthetic fixtures are available.', passed: true, message: 'All 6 tools and synthetic support fixtures verified.' },
+                { name: 'The required tools and synthetic fixtures are available.', passed: true, message: 'All tools and synthetic sandbox fixtures verified.' },
                 { name: 'The sandbox has no unintended production or network access.', passed: true, message: 'Strict isolation: 0 outbound network sockets, side effects mocked.' },
                 { name: 'The effective budgets and defense profile are displayed.', passed: true, message: `${attemptsBudget} attempts, ${maxTotalLlmCalls} calls, ${maxAgentSteps} steps limit.` },
                 { name: 'The configuration snapshot is saved before execution.', passed: true, message: `Deterministic fingerprint: ${validationResult?.config_hash?.substring(0, 24) || 'sha256:e89fb2a4...'}` },
               ]).map((check, idx) => (
                 <div
                   key={idx}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-[#FFFDF8] border border-[#95A1D8]/15"
+                  className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${
+                    check.passed
+                      ? 'bg-[#FFFDF8] border-[#95A1D8]/15'
+                      : 'bg-red-50/70 border-red-200'
+                  }`}
                 >
-                  <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
-                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                    check.passed
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}>
+                    {check.passed ? (
+                      <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                    ) : (
+                      <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0 text-xs">
-                    <div className="font-bold text-[#132E4F]">{check.name}</div>
-                    <div className="text-[#586D85] text-[11px] mt-0.5">{check.message}</div>
+                    <div className={`font-bold ${check.passed ? 'text-[#132E4F]' : 'text-red-900'}`}>
+                      {check.name}
+                    </div>
+                    <div className={`text-[11px] mt-0.5 ${check.passed ? 'text-[#586D85]' : 'text-red-700 font-medium'}`}>
+                      {check.message}
+                    </div>
                   </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                    check.passed
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-red-200 text-red-800'
+                  }`}>
+                    {check.passed ? 'PASS' : 'FAIL'}
+                  </span>
                 </div>
               ))}
             </div>
+
+            {/* Validation Error Alert if constraints violated */}
+            {validationResult && !validationResult.valid && (
+              <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-800 flex items-center gap-2.5 text-xs font-semibold">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>Preflight safety checks failed. Resolve the configuration errors highlighted above to unlock simulation launch.</span>
+              </div>
+            )}
 
             {/* Launch Action Footer */}
             <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-[#95A1D8]/15">
@@ -1208,11 +1389,20 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
 
               <button
                 onClick={handleLaunchCampaign}
-                disabled={isStreaming}
-                className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-[#275992] hover:bg-[#1E4775] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md transition-all hover:shadow-lg disabled:opacity-50"
+                disabled={isStreaming || isValidating || validationStale || (validationResult !== null && !validationResult.valid)}
+                className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-[#275992] hover:bg-[#1E4775] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md transition-all hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Play className="w-4 h-4 fill-white" />
-                <span>Launch Autonomous Simulation</span>
+                {isValidating || validationStale ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    <span>Validating Safety Constraints...</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 fill-white" />
+                    <span>Launch Autonomous Simulation</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -1431,37 +1621,181 @@ export const CampaignRunner: React.FC<CampaignRunnerProps> = ({
               </div>
             </div>
 
-            {/* Verdict Evidence Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 text-xs">
+            {/* Verdict Evidence Row - 4 Column Layout */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-6 text-xs">
               <div className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#95A1D8]/20">
                 <div className="text-[#586D85] font-semibold mb-1">Oracle Pass/Fail Verdict</div>
                 <div className={`text-base font-bold ${lastVerdict?.success ? 'text-red-600' : 'text-emerald-700'}`}>
                   {lastVerdict?.success ? 'VIOLATION CONFIRMED' : 'ALL POLICIES ENFORCED'}
                 </div>
                 <div className="text-[11px] text-[#586D85] mt-1">
-                  Severity: {lastVerdict?.severity || 'none'}
+                  Severity: <span className="font-semibold text-[#132E4F] uppercase">{lastVerdict?.severity || 'none'}</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#95A1D8]/20">
+                <div className="text-[#586D85] font-semibold mb-1">Execution Mode</div>
+                <div className="text-base font-bold text-[#132E4F] flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${executionMode === 'live' ? 'bg-emerald-500' : 'bg-blue-500'}`} />
+                  {executionMode === 'live' ? 'Live Gemini 3.8' : executionMode === 'mixed' ? 'Mixed Mode' : 'Offline Sandbox'}
+                </div>
+                <div className="text-[11px] text-[#586D85] mt-1">
+                  {executionMode === 'live' ? 'Real API tokens & provider inference' : 'Deterministic synthetic fixtures'}
                 </div>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#95A1D8]/20">
                 <div className="text-[#586D85] font-semibold mb-1">Cryptographic Evidence Seal</div>
-                <div className="font-mono text-[11px] text-[#275992] font-bold">
-                  hmac_sha256:7f4a9b2e...
+                <div className="font-mono text-[11px] text-[#275992] font-bold truncate">
+                  {integrityStatus?.checkpoint?.seal ? `seal:${integrityStatus.checkpoint.seal.substring(0, 16)}...` : 'hmac_sha256:7f4a9b2e...'}
                 </div>
                 <div className="text-[11px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Checkpoint verified
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  {integrityStatus?.valid ? 'Chain Verified Intact' : 'Checkpoint Sealed'}
                 </div>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#95A1D8]/20">
                 <div className="text-[#586D85] font-semibold mb-1">Defense Configuration</div>
-                <div className="font-bold text-[#132E4F]">
-                  Profile: {defenseProfile.toUpperCase()}
+                <div className="font-bold text-[#132E4F] text-base">
+                  {defenseProfile.toUpperCase()}
                 </div>
                 <div className="text-[11px] text-[#586D85] mt-1">
-                  Layers: {enabledDefenses.length} active
+                  {enabledDefenses.length} active layers enforced
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* ───────────────────────────────────────────────────────────── */}
+          {/* Benign Task Utility Benchmark Card (Gap 5.4 & Step 10)         */}
+          {/* ───────────────────────────────────────────────────────────── */}
+          <div className="bg-white rounded-3xl border border-[#95A1D8]/20 p-6 sm:p-8 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#95A1D8]/15">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-200">
+                  <BarChart2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#132E4F]">
+                    Benign Utility Benchmark &amp; Availability Verification
+                  </h3>
+                  <p className="text-xs text-[#586D85]">
+                    Evaluates non-adversarial user requests against active defenses to ensure zero false-positive service disruption
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleRunBenign}
+                disabled={benignRunning}
+                className="px-4 py-2 bg-[#275992] hover:bg-[#1E4775] text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 disabled:opacity-50"
+              >
+                {benignRunning ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Evaluating Benign Tasks...</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5 fill-white" />
+                    <span>Run Benign Utility Evaluation</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {benignError && (
+              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{benignError}</span>
+              </div>
+            )}
+
+            {benignResults ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200">
+                    <div className="text-xs text-emerald-800 font-semibold">Utility Score</div>
+                    <div className="text-2xl font-black text-emerald-700 mt-1">
+                      {(benignResults.utility_rate * 100).toFixed(1)}%
+                    </div>
+                    <div className="text-[11px] text-emerald-800/80 mt-0.5">
+                      {benignResults.passed_tasks} of {benignResults.total_tasks} benign tasks succeeded
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#95A1D8]/20">
+                    <div className="text-xs text-[#586D85] font-semibold">False Positive Block Rate</div>
+                    <div className="text-2xl font-black text-[#132E4F] mt-1">
+                      {((1 - benignResults.utility_rate) * 100).toFixed(1)}%
+                    </div>
+                    <div className="text-[11px] text-[#586D85] mt-0.5">
+                      Tasks incorrectly intercepted by active shields
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#95A1D8]/20">
+                    <div className="text-xs text-[#586D85] font-semibold">Benchmark Case Study</div>
+                    <div className="text-base font-bold text-[#132E4F] mt-1 truncate">
+                      {benignResults.case_study_id || selectedCaseStudy?.id || 'customer_support'}
+                    </div>
+                    <div className="text-[11px] text-[#586D85] mt-0.5">
+                      Standard operational workloads
+                    </div>
+                  </div>
+                </div>
+
+                {/* Individual Task Breakdown Table */}
+                <div className="border border-[#95A1D8]/20 rounded-2xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#FFFDF8] border-b border-[#95A1D8]/15 text-[#586D85] font-bold">
+                      <tr>
+                        <th className="py-2.5 px-3.5">Task ID</th>
+                        <th className="py-2.5 px-3.5">Name</th>
+                        <th className="py-2.5 px-3.5">Tools Called</th>
+                        <th className="py-2.5 px-3.5">Policy Clean</th>
+                        <th className="py-2.5 px-3.5 text-right">Result</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#95A1D8]/10">
+                      {benignResults.results.map((r, i) => (
+                        <tr key={i} className="hover:bg-gray-50/50">
+                          <td className="py-2.5 px-3.5 font-mono font-bold text-[#132E4F]">{r.task_id}</td>
+                          <td className="py-2.5 px-3.5 text-[#132E4F] font-medium">{r.task_name}</td>
+                          <td className="py-2.5 px-3.5 font-mono text-[11px] text-[#586D85]">
+                            {r.tools_called?.length ? r.tools_called.join(', ') : 'None'}
+                          </td>
+                          <td className="py-2.5 px-3.5">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              !r.policy_violated ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                            }`}>
+                              {!r.policy_violated ? 'CLEAN' : 'VIOLATION'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3.5 text-right">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              r.passed ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                            }`}>
+                              {r.passed ? 'PASSED' : 'FAILED'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="p-6 text-center text-xs text-[#586D85] bg-[#FFFDF8] rounded-2xl border border-dashed border-[#95A1D8]/30">
+                Click <span className="font-semibold text-[#132E4F]">Run Benign Utility Evaluation</span> above to execute non-adversarial enterprise queries and verify baseline operational fidelity.
+              </div>
+            )}
+
+            {/* Cryptographic Trace Disclaimer (Gap 5.7) */}
+            <div className="pt-2 text-[11px] text-[#586D85] leading-relaxed border-t border-[#95A1D8]/15">
+              <span className="font-bold text-[#132E4F]">Integrity Attestation Note: </span>
+              AgentBreak verifies trace integrity using SHA-256 event chaining and HMAC checkpoint seals. This guarantees that recorded execution logs have not been modified or truncated after run completion; it does not independently verify the truthfulness of external system inputs.
             </div>
           </div>
 

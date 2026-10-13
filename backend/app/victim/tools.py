@@ -224,12 +224,8 @@ TOOL_REGISTRY: dict[str, Callable[..., Any]] = {
 # ── Gemini-compatible function declarations ─────────────────────────
 
 
-def get_tool_declarations() -> list[types.Tool]:
-    """Return Gemini-compatible tool declarations for all registered tools.
-
-    These are passed directly to the ``tools`` parameter of
-    ``generate_content``.
-    """
+def get_tool_declarations(allowed_tools: list[str] | set[str] | None = None) -> list[types.Tool]:
+    """Return Gemini-compatible tool declarations, optionally filtered to allowed_tools."""
     declarations = [
         types.FunctionDeclaration(
             name="read_email",
@@ -410,4 +406,7 @@ def get_tool_declarations() -> list[types.Tool]:
             )
         ),
     ]
+    if allowed_tools is not None:
+        allowed_set = set(allowed_tools)
+        declarations = [d for d in declarations if d.name in allowed_set]
     return [types.Tool(function_declarations=declarations)]

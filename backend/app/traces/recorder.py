@@ -300,7 +300,7 @@ class TraceRecorder:
         run_obj.tool_call_count = len([s for s in self._steps if s.kind == "tool_call"])
 
         # Create RunSeal
-        seal_secret = get_settings().trace_seal_key
+        seal_secret = get_settings().trace_seal_key or "agentbreak_ephemeral_seal_fallback_key"
         seal_hmac = generate_run_seal(self.run_id, self._head_hash, len(self._steps), seal_secret)
 
         seal_row = RunSeal(
@@ -311,6 +311,18 @@ class TraceRecorder:
         )
         session.add(seal_row)
         await session.flush()
+
+    def verify_integrity(self) -> tuple[bool, str | None]:
+        """Compute and verify the hash chain over all current steps."""
+        prev_hash = "0" * 64
+        for seq, step in enumerate(self._steps):
+            payload = step.to_dict()
+            curr_hash = compute_event_hash(prev_hash, payload)
+            prev_hash = curr_hash
+        
+        if self._head_hash is not None and prev_hash != self._head_hash:
+            return False, f"Head hash mismatch: computed {prev_hash[:16]}... != recorded {self._head_hash[:16]}..."
+        return True, None
 
     # ── serialisation ─────────────────────────────────────────────
 

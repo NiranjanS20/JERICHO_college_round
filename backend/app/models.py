@@ -167,6 +167,7 @@ class Campaign(Base):
     attempts_used: Mapped[int] = mapped_column(Integer, default=0)
     config_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
     defense_ids: Mapped[list] = mapped_column(JSON, default=list)
+    execution_mode: Mapped[str] = mapped_column(String, default="offline") # live | offline | mixed
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_by: Mapped[str | None] = mapped_column(String, ForeignKey("profiles.id"), nullable=True)
@@ -199,6 +200,8 @@ class Attack(Base):
     model_assisted: Mapped[bool] = mapped_column(Boolean, default=False)
     best_in_chain: Mapped[bool] = mapped_column(Boolean, default=False)
     oracle_verdict: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    execution_mode: Mapped[str] = mapped_column(String, default="offline") # live | offline | mixed
+    config_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     campaign: Mapped[Campaign] = relationship("Campaign", back_populates="attacks")

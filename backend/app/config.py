@@ -24,10 +24,18 @@ class Settings(BaseSettings):
     """AgentBreak configuration — reads from .env at the repo root."""
 
     model_config = SettingsConfigDict(
-        env_file=str(_ENV_FILE),
+        env_file=(str(Path.cwd() / ".env"), str(_ENV_FILE)),
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    def __repr__(self) -> str:
+        fields = self.model_dump()
+        if "gemini_api_key" in fields and fields["gemini_api_key"]:
+            fields["gemini_api_key"] = "***REDACTED***"
+        if "trace_seal_key" in fields and fields["trace_seal_key"]:
+            fields["trace_seal_key"] = "***REDACTED***"
+        return f"Settings({fields})"
 
     # ── Gemini API ──────────────────────────────────────────────
     gemini_api_key: str = ""
@@ -59,7 +67,7 @@ class Settings(BaseSettings):
     supabase_jwks_url: str = ""
     database_url: str = "sqlite+aiosqlite:///./agentbreak.db"
     database_url_direct: str = ""
-    trace_seal_key: str = "agentbreak_default_seal_secret_key_2026"
+    trace_seal_key: str = ""
     cors_origins: str = "*"
 
     # ── Demo mode ───────────────────────────────────────────────

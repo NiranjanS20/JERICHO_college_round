@@ -15,9 +15,17 @@ from app.security.leak_scanner import LeakScanner
 class Gateway:
     """Central point for tool execution and policy enforcement."""
     
-    def __init__(self, defenses: DefensePipeline, taint_tracker: TaintTracker | None = None) -> None:
+    def __init__(
+        self,
+        defenses: DefensePipeline,
+        taint_tracker: TaintTracker | None = None,
+        allowed_tools: list[str] | set[str] | None = None,
+        caller_role: str = "employee",
+    ) -> None:
         self.defenses = defenses
         self.taint_tracker = taint_tracker or TaintTracker()
+        self.allowed_tools = set(allowed_tools) if allowed_tools is not None else None
+        self.caller_role = caller_role
         self.recorded_events: list[dict[str, Any]] = []
         self.leak_scanner = LeakScanner()
         
@@ -31,9 +39,19 @@ class Gateway:
             "taint": self.taint_tracker.get_all_origins()
         })
         
-        # 1. Validation
+        # 1. Validation & Allowlist Check
         if tool_name not in TOOL_REGISTRY:
             return {"error": f"Unknown tool: {tool_name}"}
+
+        if self.allowed_tools is not None and tool_name not in self.allowed_tools:
+            reason = f"Tool '{tool_name}' is not permitted in target manifest or caller role '{self.caller_role}'."
+            self.recorded_events.append({
+                "type": "policy_decision",
+                "tool_name": tool_name,
+                "allowed": False,
+                "reason": reason,
+            })
+            return {"error": f"Authorization denied: {reason}"}
             
         tool_func = TOOL_REGISTRY[tool_name]
         

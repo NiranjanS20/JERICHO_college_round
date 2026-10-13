@@ -13,12 +13,18 @@ from app.defenses.human_approval import HumanApprovalDefense
 from app.defenses.injection_classifier import InjectionClassifierDefense
 from app.defenses.policy_engine import PolicyEngineDefense
 
-DEFENSE_REGISTRY: dict[str, type[Defense]] = {
+CANONICAL_DEFENSES: dict[str, type[Defense]] = {
     "delimiting": DelimitingDefense,
     "hierarchy_prompt": HierarchyPromptDefense,
     "policy_engine": PolicyEngineDefense,
     "injection_classifier": InjectionClassifierDefense,
     "human_approval": HumanApprovalDefense,
+}
+
+DEFENSE_REGISTRY: dict[str, type[Defense]] = {
+    **CANONICAL_DEFENSES,
+    "human_approval_gate": HumanApprovalDefense,
+    "gateway": PolicyEngineDefense,
 }
 
 
@@ -36,7 +42,7 @@ def list_defense_metadata() -> list[dict[str, str]]:
             "name": cls.name,
             "description": cls.description,
         }
-        for cls in DEFENSE_REGISTRY.values()
+        for cls in CANONICAL_DEFENSES.values()
     ]
 
 
